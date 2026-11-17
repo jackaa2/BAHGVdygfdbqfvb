@@ -104,7 +104,9 @@ def main():
             break
 
     top = sorted(cands, key=lambda c: c["views"], reverse=True)[:3]
-    print(f"Found {len(cands)} candidate clips; skipped {why}; top views: {[c['views'] for c in top]}")
+    print(f"Found {len(cands)} candidate clips; skipped {why}")
+    for c in sorted(cands, key=lambda c: c["views"], reverse=True)[:12]:
+        print(f"   {c['views']:>6} views  {c['seconds']:>3}s  lang={c['language']!r}  {c['streamer']}  {c['url']}")
 
     # --- download + upload + log ---
     rows = []
