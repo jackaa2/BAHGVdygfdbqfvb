@@ -180,10 +180,11 @@ def main():
     except Exception as e:
         errors.append(f"storage check: {e}")
 
-    # --- health line (Control Panel N1:Q1) ---
-    status = "OK" if not errors else f"{len(errors)} issue(s): " + " | ".join(errors[:3])
-    g.update_values(sheet, f"'{C.PANEL_TAB}'!N1:Q1", [[
-        "🤖 ROBOT", now_et.strftime("Last run %a %I:%M %p"), ("🧪 TEST " if test else "") + f"Grabbed {grabbed}", status[:400]]])
+    # --- health line (Control Panel K1, one cell) ---
+    status = "✅ OK" if not errors else f"⚠ {len(errors)} issue(s): " + " | ".join(errors[:3])
+    line = (f"🤖 Robot · {now_et.strftime('%a %I:%M %p').replace(' 0', ' ')} · "
+            f"{'🧪 TEST ' if test else ''}grabbed {grabbed} · {status}")
+    g.update_values(sheet, f"'{C.PANEL_TAB}'!K1", [[line[:400]]])
     print(f"Grabbed {grabbed} clip(s). {status}")
 
 
@@ -202,8 +203,8 @@ if __name__ == "__main__":
         try:
             g = Google()
             now = dt.datetime.now(ET).strftime("%a %I:%M %p")
-            g.update_values(os.environ.get("SHEET_ID"), f"'{C.PANEL_TAB}'!N1:Q1",
-                            [["🤖 ROBOT", f"❌ FAILED {now}", "Grabbed 0", str(e)[:300]]])
+            g.update_values(os.environ.get("SHEET_ID"), f"'{C.PANEL_TAB}'!K1",
+                            [[f"🤖 Robot · ❌ FAILED {now} · {str(e)[:300]}"]])
         except Exception:
             pass
         sys.exit(1)
