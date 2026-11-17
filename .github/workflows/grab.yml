@@ -3,7 +3,16 @@ name: Grab GTA 6 clips
 on:
   schedule:
     - cron: "17 * * * *"      # every hour at :17 (UTC). Change to "17 */2 * * *" for every 2 hours.
-  workflow_dispatch: {}        # "Run workflow" button for a manual run
+  workflow_dispatch:           # "Run workflow" button for a manual run
+    inputs:
+      test_game:
+        description: "TEST ONLY: grab from this Twitch category instead (e.g. Grand Theft Auto V). Leave blank for normal."
+        required: false
+        default: ""
+      test_max:
+        description: "TEST ONLY: max clips to grab"
+        required: false
+        default: "5"
 
 concurrency:
   group: grab
@@ -29,4 +38,6 @@ jobs:
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
           GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
           SHEET_ID: ${{ secrets.SHEET_ID }}
+          TEST_GAME: ${{ inputs.test_game }}
+          TEST_MAX: ${{ inputs.test_max }}
         run: python grab.py

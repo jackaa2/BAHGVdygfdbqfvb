@@ -65,7 +65,15 @@ def main():
     # --- collect candidates ---
     cands = []
     tw = Twitch()
-    gta = tw.game_ids(C.GAME_NAMES)
+    test_game = (os.environ.get("TEST_GAME") or "").strip()
+    test = bool(test_game)
+    max_new = int(os.environ.get("TEST_MAX") or 5) if test else C.MAX_NEW_CLIPS_PER_RUN
+    if test:
+        print(f"TEST MODE: category '{test_game}', up to {max_new} clips")
+        tw_logins, kick_slugs = set(), set()   # category only, keeps the test clean
+    gta = tw.game_ids([test_game] if test else C.GAME_NAMES)
+    if not gta:
+        errors.append(f"category not found: {test_game or C.GAME_NAMES}")
     for gid in gta:
         cands += [dict(c, min=C.MIN_VIEWS_CATEGORY) for c in tw.clips(since, game_id=gid, first=100)]
     for login, uid in tw.user_ids(sorted(tw_logins)).items():
@@ -89,7 +97,7 @@ def main():
         if c["platform"] == "Twitch" and c["language"] and c["language"].split("-")[0] not in C.LANGUAGES:
             continue
         seen.add(c["url"]); picks.append(c)
-        if len(picks) >= C.MAX_NEW_CLIPS_PER_RUN:
+        if len(picks) >= max_new:
             break
 
     # --- download + upload + log ---
@@ -115,7 +123,7 @@ def main():
             # K Views | L Length | M Platform | N Grabbed | O Raw File | P Edited | Q-V Hooks | W Notes
             rows.append([clip_id, c["streamer"], c["title"], watch, "", "", "", "", "", "New",
                          c["views"], c["seconds"], c["platform"], now_et.strftime("%Y-%m-%d %H:%M"),
-                         drive_link, ""])
+                         drive_link, ""] + [""] * 6 + (["🧪 TEST clip (not GTA 6)"] if test else [""]))
             grabbed += 1
 
     if rows:
@@ -128,7 +136,7 @@ def main():
     # --- health line (Control Panel N1:Q1) ---
     status = "OK" if not errors else f"{len(errors)} issue(s): " + " | ".join(errors[:3])
     g.update_values(sheet, f"'{C.PANEL_TAB}'!N1:Q1", [[
-        "🤖 ROBOT", now_et.strftime("Last run %a %I:%M %p"), f"Grabbed {grabbed}", status[:400]]])
+        "🤖 ROBOT", now_et.strftime("Last run %a %I:%M %p"), ("🧪 TEST " if test else "") + f"Grabbed {grabbed}", status[:400]]])
     print(f"Grabbed {grabbed} clip(s). {status}")
 
 
