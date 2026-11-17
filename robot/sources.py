@@ -18,10 +18,20 @@ class Twitch:
             raise RuntimeError(f"Twitch sign-in failed ({r.status_code}): {r.text[:200]}")
         self.h = {"Client-Id": self.cid, "Authorization": f"Bearer {r.json()['access_token']}"}
 
-    def _get(self, path, params):
-        r = requests.get(f"https://api.twitch.tv/helix/{path}", headers=self.h, params=params, timeout=30)
-        r.raise_for_status()
-        return r.json().get("data", [])
+    def _get(self, path, params, pages=1):
+        out, cursor = [], None
+        for _ in range(pages):
+            p = list(params.items()) if isinstance(params, dict) else list(params)
+            if cursor:
+                p.append(("after", cursor))
+            r = requests.get(f"https://api.twitch.tv/helix/{path}", headers=self.h, params=p, timeout=30)
+            r.raise_for_status()
+            j = r.json()
+            out += j.get("data", [])
+            cursor = (j.get("pagination") or {}).get("cursor")
+            if not cursor:
+                break
+        return out
 
     def game_ids(self, names):
         return {g["id"]: g["name"] for g in self._get("games", [("name", n) for n in names])}
@@ -34,7 +44,7 @@ class Twitch:
                 out[u["login"].lower()] = u["id"]
         return out
 
-    def clips(self, since, game_id=None, broadcaster_id=None, first=50):
+    def clips(self, since, game_id=None, broadcaster_id=None, first=50, pages=1):
         p = {"started_at": since.strftime("%Y-%m-%dT%H:%M:%SZ"),
              "ended_at": dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), "first": first}
         if game_id:
@@ -51,7 +61,7 @@ class Twitch:
             "language": c.get("language", ""),
             "game_id": c.get("game_id", ""),
             "created": c["created_at"],
-        } for c in self._get("clips", p)]
+        } for c in self._get("clips", p, pages=pages)]
 
 
 def kick_clips(slug, since):

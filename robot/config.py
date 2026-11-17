@@ -30,3 +30,5 @@ FOLDERS = {
 }
 # Empty duplicate made by running setup twice; trashed only if it holds no files.
 DUPLICATE_ROOTS = ["1WWHteRmD_-S30F2qby53gq9qeRN8riL5"]
+
+CATEGORY_PAGES = 5                     # read up to 500 category clips (big non-English streams crowd the first 100)

@@ -75,7 +75,7 @@ def main():
     if not gta:
         errors.append(f"category not found: {test_game or C.GAME_NAMES}")
     for gid in gta:
-        cands += [dict(c, min=C.MIN_VIEWS_CATEGORY) for c in tw.clips(since, game_id=gid, first=100)]
+        cands += [dict(c, min=C.MIN_VIEWS_CATEGORY) for c in tw.clips(since, game_id=gid, first=100, pages=C.CATEGORY_PAGES)]
     for login, uid in tw.user_ids(sorted(tw_logins)).items():
         try:
             cands += [dict(c, min=C.MIN_VIEWS_TRACKED) for c in tw.clips(since, broadcaster_id=uid, first=20)]
@@ -105,7 +105,7 @@ def main():
 
     top = sorted(cands, key=lambda c: c["views"], reverse=True)[:3]
     print(f"Found {len(cands)} candidate clips; skipped {why}")
-    for c in sorted(cands, key=lambda c: c["views"], reverse=True)[:12]:
+    for c in [c for c in sorted(cands, key=lambda c: c["views"], reverse=True) if c["language"][:2] == "en"][:8]:
         print(f"   {c['views']:>6} views  {c['seconds']:>3}s  lang={c['language']!r}  {c['streamer']}  {c['url']}")
 
     # --- download + upload + log ---
