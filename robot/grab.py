@@ -110,7 +110,11 @@ def main():
             grabbed += 1
 
     if rows:
-        g.append_rows(sheet, f"'{C.PANEL_TAB}'!A{C.HEADER_ROWS + 1}", rows)
+        # write directly under the last filled Clip ID (checkbox columns make "append" jump to the bottom)
+        ids = g.get_values(sheet, f"'{C.PANEL_TAB}'!A{C.HEADER_ROWS + 1}:A")
+        last = max([i for i, r in enumerate(ids) if r and str(r[0]).strip()], default=-1)
+        start = C.HEADER_ROWS + 1 + last + 1
+        g.update_values(sheet, f"'{C.PANEL_TAB}'!A{start}", rows)
 
     # --- health line (Control Panel O1:T1) ---
     status = "OK" if not errors else f"{len(errors)} issue(s): " + " | ".join(errors[:3])
