@@ -35,7 +35,8 @@ class Twitch:
         return out
 
     def clips(self, since, game_id=None, broadcaster_id=None, first=50):
-        p = {"started_at": since.strftime("%Y-%m-%dT%H:%M:%SZ"), "first": first}
+        p = {"started_at": since.strftime("%Y-%m-%dT%H:%M:%SZ"),
+             "ended_at": dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), "first": first}
         if game_id:
             p["game_id"] = game_id
         if broadcaster_id:

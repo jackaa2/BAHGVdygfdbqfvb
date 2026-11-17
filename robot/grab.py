@@ -89,16 +89,22 @@ def main():
 
     # --- filter, dedupe, best first ---
     seen, picks = set(), []
+    why = {"already have": 0, "too few views": 0, "wrong length": 0, "not English": 0}
     for c in sorted(cands, key=lambda c: c["views"], reverse=True):
         if c["url"] in known or c["url"] in seen:
-            continue
-        if c["views"] < c["min"] or not (C.MIN_SECONDS <= c["seconds"] <= C.MAX_SECONDS):
-            continue
+            why["already have"] += 1; continue
+        if c["views"] < c["min"]:
+            why["too few views"] += 1; continue
+        if not (C.MIN_SECONDS <= c["seconds"] <= C.MAX_SECONDS):
+            why["wrong length"] += 1; continue
         if c["platform"] == "Twitch" and c["language"] and c["language"].split("-")[0] not in C.LANGUAGES:
-            continue
+            why["not English"] += 1; continue
         seen.add(c["url"]); picks.append(c)
         if len(picks) >= max_new:
             break
+
+    top = sorted(cands, key=lambda c: c["views"], reverse=True)[:3]
+    print(f"Found {len(cands)} candidate clips; skipped {why}; top views: {[c['views'] for c in top]}")
 
     # --- download + upload + log ---
     rows = []
