@@ -119,7 +119,14 @@ def main():
     print(f"Grabbed {grabbed} clip(s). {status}")
 
 
+REQUIRED = ["TWITCH_CLIENT_ID", "TWITCH_CLIENT_SECRET", "GOOGLE_CLIENT_ID",
+            "GOOGLE_CLIENT_SECRET", "GOOGLE_REFRESH_TOKEN", "SHEET_ID"]
+
 if __name__ == "__main__":
+    missing = [k for k in REQUIRED if not os.environ.get(k)]
+    if missing:
+        print("Setup not finished yet, skipping this run. Missing secrets: " + ", ".join(missing))
+        sys.exit(0)
     try:
         main()
     except Exception:
