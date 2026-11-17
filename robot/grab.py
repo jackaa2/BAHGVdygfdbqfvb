@@ -75,7 +75,7 @@ def main():
     if not gta:
         errors.append(f"category not found: {test_game or C.GAME_NAMES}")
     for gid in gta:
-        cands += [dict(c, min=C.MIN_VIEWS_CATEGORY) for c in tw.clips(since, game_id=gid, first=100, pages=C.CATEGORY_PAGES)]
+        cands += [dict(c, min=(100 if test else C.MIN_VIEWS_CATEGORY)) for c in tw.clips(since, game_id=gid, first=100, pages=C.CATEGORY_PAGES)]
     for login, uid in tw.user_ids(sorted(tw_logins)).items():
         try:
             cands += [dict(c, min=C.MIN_VIEWS_TRACKED) for c in tw.clips(since, broadcaster_id=uid, first=20)]
