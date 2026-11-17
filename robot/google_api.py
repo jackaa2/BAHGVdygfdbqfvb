@@ -83,6 +83,29 @@ class Google:
             "name": name, "mimeType": "application/vnd.google-apps.folder", "parents": [parent_id]})
         return r.json()["id"]
 
+    def rename(self, file_id, name):
+        r = self._req("GET", f"{DRIVE}/files/{file_id}", params={"fields": "name,trashed"})
+        if r.json().get("name") != name:
+            self._req("PATCH", f"{DRIVE}/files/{file_id}", json={"name": name})
+
+    def trash_if_no_files(self, folder_id):
+        """Trash a folder only if nothing but (empty) subfolders live under it. Returns True if trashed."""
+        r = self._req("GET", f"{DRIVE}/files/{folder_id}", params={"fields": "trashed"})
+        if r.json().get("trashed"):
+            return False
+        stack = [folder_id]
+        while stack:
+            fid = stack.pop()
+            kids = self._req("GET", f"{DRIVE}/files", params={
+                "q": f"'{fid}' in parents and trashed = false",
+                "fields": "files(id,mimeType)", "pageSize": 200}).json().get("files", [])
+            for k in kids:
+                if k["mimeType"] != "application/vnd.google-apps.folder":
+                    return False
+                stack.append(k["id"])
+        self._req("PATCH", f"{DRIVE}/files/{folder_id}", json={"trashed": True})
+        return True
+
     def upload(self, path, name, parent_id, mime="video/mp4"):
         """Resumable upload (works for big files)."""
         meta = {"name": name, "parents": [parent_id]}

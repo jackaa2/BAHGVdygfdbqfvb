@@ -1,4 +1,4 @@
-"""Hourly: pull the best new GTA 6 clips, save raw MP4s to Drive 01_Raw/<date>/, log rows in the Control Panel.
+"""Hourly: pull the best new GTA 6 clips, save raw MP4s to Drive '1 - New Clips'/<date>/, log rows in the Control Panel.
 
 Raw = exactly what Twitch/Kick serve: no captions, no watermark added.
 """
@@ -12,7 +12,7 @@ import traceback
 from zoneinfo import ZoneInfo
 
 import config as C
-from google_api import Google, folder_ids_from_panel
+from google_api import Google
 from sources import Twitch, kick_clips, slug_from_link
 
 ET = ZoneInfo("America/New_York")
@@ -25,23 +25,29 @@ def main():
     since = dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=C.LOOKBACK_HOURS)
     errors, grabbed = [], 0
 
-    # --- what's already logged (dedupe by clip link, column H) ---
-    panel = g.get_values(sheet, f"'{C.PANEL_TAB}'!A{C.HEADER_ROWS + 1}:H", formulas=True)
+    # --- Drive housekeeping: clear names, remove the empty duplicate ---
+    try:
+        g.rename(*C.ROOT_FOLDER)
+        for fid, name in C.FOLDERS.values():
+            g.rename(fid, name)
+        for dup in C.DUPLICATE_ROOTS:
+            if g.trash_if_no_files(dup):
+                print(f"Trashed empty duplicate folder {dup}")
+    except Exception as e:
+        errors.append(f"folder tidy: {e}")
+
+    # --- what's already logged (dedupe by any clip link anywhere in the row) ---
+    panel = g.get_values(sheet, f"'{C.PANEL_TAB}'!A{C.HEADER_ROWS + 1}:W", formulas=True)
     known = set()
     for row in panel:
-        if len(row) > 7:
-            m = re.search(r'https?://[^"\s]+', str(row[7]))
-            if m:
-                known.add(m.group(0))
+        for cell in row:
+            for u in re.findall(r'https?://(?:www\.|clips\.)?(?:twitch\.tv|kick\.com)[^"\s]*', str(cell)):
+                known.add(u)
     today_prefix = now_et.strftime("%m%d")
     today_count = sum(1 for row in panel if row and str(row[0]).startswith(today_prefix))
 
-    # --- Drive folders (written into row 2 by the sheet add-on) ---
-    row2 = g.get_values(sheet, f"'{C.PANEL_TAB}'!D2:M2", formulas=True)
-    folders = folder_ids_from_panel(row2[0] if row2 else [])
-    raw_root = folders.get("01 Raw")
-    if not raw_root:
-        raise RuntimeError("Drive folders not found. Run 🎬 Clip Hub > First-time setup in the sheet first.")
+    # --- Drive: new clips go into "1 - New Clips/<date>" ---
+    raw_root = C.FOLDERS["new"][0]
     day_folder = g.ensure_folder(raw_root, now_et.strftime("%Y-%m-%d"))
 
     # --- tracked streamers from the Streamers + Links tab ---
@@ -103,10 +109,13 @@ def main():
                 errors.append(f"{clip_id}: download failed: {(e.stderr or '')[-200:]}"); continue
             except Exception as e:
                 errors.append(f"{clip_id}: {e}"); continue
-            drive_link = f'=HYPERLINK("https://drive.google.com/file/d/{fid}/view","▶ raw file")'
+            drive_link = f'=HYPERLINK("https://drive.google.com/file/d/{fid}/view","📄 raw")'
             watch = f'=HYPERLINK("{c["url"]}","▶ watch")'
-            rows.append([clip_id, now_et.strftime("%Y-%m-%d %H:%M"), c["streamer"], c["platform"],
-                         c["title"], c["views"], c["seconds"], watch, drive_link] + [""] * 17 + ["Raw"])
+            # A ID | B Streamer | C Title | D Watch | E-G Claude | H Decision | I By | J Status
+            # K Views | L Length | M Platform | N Grabbed | O Raw File | P Edited | Q-V Hooks | W Notes
+            rows.append([clip_id, c["streamer"], c["title"], watch, "", "", "", "", "", "New",
+                         c["views"], c["seconds"], c["platform"], now_et.strftime("%Y-%m-%d %H:%M"),
+                         drive_link, ""])
             grabbed += 1
 
     if rows:
@@ -116,9 +125,9 @@ def main():
         start = C.HEADER_ROWS + 1 + last + 1
         g.update_values(sheet, f"'{C.PANEL_TAB}'!A{start}", rows)
 
-    # --- health line (Control Panel O1:T1) ---
+    # --- health line (Control Panel N1:Q1) ---
     status = "OK" if not errors else f"{len(errors)} issue(s): " + " | ".join(errors[:3])
-    g.update_values(sheet, f"'{C.PANEL_TAB}'!O1:R1", [[
+    g.update_values(sheet, f"'{C.PANEL_TAB}'!N1:Q1", [[
         "🤖 ROBOT", now_et.strftime("Last run %a %I:%M %p"), f"Grabbed {grabbed}", status[:400]]])
     print(f"Grabbed {grabbed} clip(s). {status}")
 

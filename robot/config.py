@@ -15,3 +15,18 @@ MIN_VIEWS_TRACKED = 100                # clips from streamers on our list
 MIN_SECONDS, MAX_SECONDS = 6, 60
 LANGUAGES = {"en"}                      # skip non-English clips
 MAX_NEW_CLIPS_PER_RUN = 15              # keeps Drive + your queue under control
+
+# Drive folders (fixed IDs, so renaming folders never breaks anything).
+# Names are applied automatically on every run.
+ROOT_FOLDER = ("1lZN5Lh0Vp0Y6gFd9tZ-sDyqCyQneaUWc", "GTA6 Clip Hub - VIDEOS")
+FOLDERS = {
+    "brand":    ("1arUg_7htt2yuWDGNckSwkbjhB7Exc9LF", "0 - Brand Kit (logos + watermarks)"),
+    "new":      ("1jlABYCermfUiZy3h3J-kfgoXI_0ONAVB", "1 - New Clips (robot drops here)"),
+    "hold":     ("1z-PtRgIk5FZ9Wtn_kjSaM5NjmX6sz9W4", "2 - On Hold"),
+    "approved": ("1U8tdARMO6ecABiM7AAr4B4x0GH5XNhId", "3 - Approved (waiting for edits)"),
+    "ready":    ("1tbW_vEMgs6rx7UlxW_miH8HeakZ4unfC", "4 - Ready to Post (by account)"),
+    "posted":   ("1YhAGL4AzGWA9rQKCk-5FOacOTmGMKMwA", "5 - Posted"),
+    "rejected": ("1JScjCRfpeeUjXpM8jJuX47Hd_AXSCs2G", "6 - Rejected"),
+}
+# Empty duplicate made by running setup twice; trashed only if it holds no files.
+DUPLICATE_ROOTS = ["1WWHteRmD_-S30F2qby53gq9qeRN8riL5"]
