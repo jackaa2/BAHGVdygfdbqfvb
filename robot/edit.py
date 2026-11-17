@@ -77,7 +77,14 @@ def transcribe(path):
     from faster_whisper import WhisperModel
     if _model is None:
         _model = WhisperModel(C.WHISPER_MODEL, device="cpu", compute_type="int8")
-    segs, _ = _model.transcribe(path, word_timestamps=True, vad_filter=True, language="en")
+    # decode with ffmpeg ourselves (avoids PyAV version issues): 16 kHz mono float32
+    import numpy as np
+    pcm = subprocess.run(["ffmpeg", "-v", "error", "-i", path, "-vn", "-ac", "1", "-ar", "16000",
+                          "-f", "f32le", "-"], capture_output=True, check=True).stdout
+    audio = np.frombuffer(pcm, dtype=np.float32)
+    if audio.size < 16000:
+        return []
+    segs, _ = _model.transcribe(audio, word_timestamps=True, vad_filter=True, language="en")
     words = []
     for s in segs:
         for w in (s.words or []):
