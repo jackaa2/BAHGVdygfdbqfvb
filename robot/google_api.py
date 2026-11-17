@@ -66,7 +66,24 @@ class Google:
                   params={"valueInputOption": "USER_ENTERED", "insertDataOption": "INSERT_ROWS"},
                   json={"values": rows})
 
+    def ensure_rows(self, sheet_id, tab, min_rows):
+        """Grow the tab (copying the formatting of the rows above) so writes never hit the grid edge."""
+        meta = self._req("GET", f"{SHEETS}/{sheet_id}", params={
+            "fields": "sheets(properties(sheetId,title,gridProperties(rowCount)))"}).json()
+        sh = next(x["properties"] for x in meta["sheets"] if x["properties"]["title"] == tab)
+        have = sh["gridProperties"]["rowCount"]
+        if have >= min_rows:
+            return
+        add = max(min_rows - have, 500)
+        self._req("POST", f"{SHEETS}/{sheet_id}:batchUpdate", json={"requests": [{"insertDimension": {
+            "range": {"sheetId": sh["sheetId"], "dimension": "ROWS", "startIndex": have - 1, "endIndex": have - 1 + add},
+            "inheritFromBefore": True}}]})
+
     # ---- Drive ------------------------------------------------------------
+    def storage(self):
+        q = self._req("GET", f"{DRIVE}/about", params={"fields": "storageQuota"}).json()["storageQuota"]
+        return int(q.get("usage", 0)), int(q.get("limit", 0) or 0)
+
     def find_child(self, parent_id, name, folder=True):
         q = f"'{parent_id}' in parents and name = '{name}' and trashed = false"
         if folder:

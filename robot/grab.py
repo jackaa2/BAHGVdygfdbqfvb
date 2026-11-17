@@ -18,6 +18,24 @@ from sources import Twitch, kick_clips, slug_from_link
 ET = ZoneInfo("America/New_York")
 
 
+def clip_key(url):
+    """Same clip, any URL style -> one key (twitch.tv/x/clip/ID, clips.twitch.tv/ID, kick ?clip=ID)."""
+    m = re.search(r"(?:/clip/|clips\.twitch\.tv/|[?&]clip=|/clips/)([-\w]+)", url or "")
+    return m.group(1).lower() if m else (url or "").lower()
+
+
+def is_gta(c, gta_ids):
+    if c["platform"] == "Twitch":
+        return c.get("game_id") in gta_ids
+    return any(n.lower() in str(c.get("game_id", "")).lower() for n in C.GAME_NAMES)
+
+
+def safe(text):
+    """Stop titles like '=)' or '+1' from being treated as formulas."""
+    text = str(text or "").replace("\n", " ").strip()
+    return "'" + text if text[:1] in "=+-@" else text
+
+
 def main():
     sheet = os.environ.get("SHEET_ID") or C.SHEET_ID_FALLBACK
     g = Google()
@@ -42,9 +60,12 @@ def main():
     for row in panel:
         for cell in row:
             for u in re.findall(r'https?://(?:www\.|clips\.)?(?:twitch\.tv|kick\.com)[^"\s]*', str(cell)):
-                known.add(u)
+                known.add(clip_key(u))
     today_prefix = now_et.strftime("%m%d")
-    today_count = sum(1 for row in panel if row and str(row[0]).startswith(today_prefix))
+    # next number = highest number used today + 1 (never reuses an ID, even if rows get deleted)
+    nums = [int(m.group(1)) for row in panel if row
+            for m in [re.match(rf"{today_prefix}-.*-(\d+)$", str(row[0]).strip())] if m]
+    today_count = max(nums, default=0)
 
     # --- Drive: new clips go into "1 - New Clips/<date>" ---
     raw_root = C.FOLDERS["new"][0]
@@ -78,20 +99,22 @@ def main():
         cands += [dict(c, min=(100 if test else C.MIN_VIEWS_CATEGORY)) for c in tw.clips(since, game_id=gid, first=100, pages=C.CATEGORY_PAGES)]
     for login, uid in tw.user_ids(sorted(tw_logins)).items():
         try:
-            cands += [dict(c, min=C.MIN_VIEWS_TRACKED) for c in tw.clips(since, broadcaster_id=uid, first=20)]
+            cands += [dict(c, min=C.MIN_VIEWS_TRACKED, tracked=True) for c in tw.clips(since, broadcaster_id=uid, first=20)]
         except Exception as e:
             errors.append(f"Twitch {login}: {e}")
     for slug in sorted(kick_slugs):
         clips, err = kick_clips(slug, since)
         if err:
             errors.append(err)
-        cands += [dict(c, min=C.MIN_VIEWS_TRACKED) for c in clips]
+        cands += [dict(c, min=C.MIN_VIEWS_TRACKED, tracked=True) for c in clips]
 
     # --- filter, dedupe, best first ---
     seen, picks = set(), []
-    why = {"already have": 0, "too few views": 0, "wrong length": 0, "not English": 0}
+    why = {"not GTA 6": 0, "already have": 0, "too few views": 0, "wrong length": 0, "not English": 0}
     for c in sorted(cands, key=lambda c: c["views"], reverse=True):
-        if c["url"] in known or c["url"] in seen:
+        if c.get("tracked") and not is_gta(c, gta):
+            why["not GTA 6"] += 1; continue
+        if clip_key(c["url"]) in known or clip_key(c["url"]) in seen:
             why["already have"] += 1; continue
         if c["views"] < c["min"]:
             why["too few views"] += 1; continue
@@ -99,17 +122,20 @@ def main():
             why["wrong length"] += 1; continue
         if c["platform"] == "Twitch" and c["language"] and c["language"].split("-")[0] not in C.LANGUAGES:
             why["not English"] += 1; continue
-        seen.add(c["url"]); picks.append(c)
+        seen.add(clip_key(c["url"])); picks.append(c)
         if len(picks) >= max_new:
             break
 
-    top = sorted(cands, key=lambda c: c["views"], reverse=True)[:3]
     print(f"Found {len(cands)} candidate clips; skipped {why}")
     for c in [c for c in sorted(cands, key=lambda c: c["views"], reverse=True) if c["language"][:2] == "en"][:8]:
         print(f"   {c['views']:>6} views  {c['seconds']:>3}s  lang={c['language']!r}  {c['streamer']}  {c['url']}")
 
-    # --- download + upload + log ---
-    rows = []
+    # --- download + upload + log (each row is written as soon as its video is in Drive) ---
+    ids = g.get_values(sheet, f"'{C.PANEL_TAB}'!A{C.HEADER_ROWS + 1}:A")
+    last = max([i for i, r in enumerate(ids) if r and str(r[0]).strip()], default=-1)
+    next_row = C.HEADER_ROWS + 1 + last + 1
+    if picks:
+        g.ensure_rows(sheet, C.PANEL_TAB, next_row + len(picks) + 50)
     with tempfile.TemporaryDirectory() as tmp:
         for c in picks:
             today_count += 1
@@ -129,17 +155,22 @@ def main():
             watch = f'=HYPERLINK("{c["url"]}","▶ watch")'
             # A ID | B Streamer | C Title | D Watch | E-G Claude | H Decision | I By | J Status
             # K Views | L Length | M Platform | N Grabbed | O Raw File | P Edited | Q-V Hooks | W Notes
-            rows.append([clip_id, c["streamer"], c["title"], watch, "", "", "", "", "", "New",
+            row = ([clip_id, safe(c["streamer"]), safe(c["title"]), watch, "", "", "", "", "", "New",
                          c["views"], c["seconds"], c["platform"], now_et.strftime("%Y-%m-%d %H:%M"),
                          drive_link, ""] + [""] * 6 + (["🧪 TEST clip (not GTA 6)"] if test else [""]))
-            grabbed += 1
+            try:
+                g.update_values(sheet, f"'{C.PANEL_TAB}'!A{next_row}", [row])
+                next_row += 1; grabbed += 1
+            except Exception as e:
+                errors.append(f"{clip_id}: saved to Drive but sheet write failed: {e}")
 
-    if rows:
-        # write directly under the last filled Clip ID (checkbox columns make "append" jump to the bottom)
-        ids = g.get_values(sheet, f"'{C.PANEL_TAB}'!A{C.HEADER_ROWS + 1}:A")
-        last = max([i for i, r in enumerate(ids) if r and str(r[0]).strip()], default=-1)
-        start = C.HEADER_ROWS + 1 + last + 1
-        g.update_values(sheet, f"'{C.PANEL_TAB}'!A{start}", rows)
+    # --- Drive space check ---
+    try:
+        used, limit = g.storage()
+        if limit and used / limit > 0.8:
+            errors.insert(0, f"DRIVE {used / limit:.0%} FULL ({used / 1e9:.1f} of {limit / 1e9:.0f} GB)")
+    except Exception as e:
+        errors.append(f"storage check: {e}")
 
     # --- health line (Control Panel N1:Q1) ---
     status = "OK" if not errors else f"{len(errors)} issue(s): " + " | ".join(errors[:3])
@@ -158,6 +189,13 @@ if __name__ == "__main__":
         sys.exit(0)
     try:
         main()
-    except Exception:
+    except Exception as e:
         traceback.print_exc()
+        try:
+            g = Google()
+            now = dt.datetime.now(ET).strftime("%a %I:%M %p")
+            g.update_values(os.environ.get("SHEET_ID"), f"'{C.PANEL_TAB}'!N1:Q1",
+                            [["🤖 ROBOT", f"❌ FAILED {now}", "Grabbed 0", str(e)[:300]]])
+        except Exception:
+            pass
         sys.exit(1)
