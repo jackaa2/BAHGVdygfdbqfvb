@@ -100,13 +100,13 @@ function writeLinks_(ids) {
   panel.getRange(2, 3, 1, 9).setValues([[
     '📁 FOLDERS:',
     link(ids.ROOT, '📂 All Videos'),
-    link(ids['01_Raw'], '📥 1 New Clips'),
-    link(ids['02_Screened'], '⏸ 2 On Hold'),
-    link(ids['03_Approved'], '✅ 3 Approved'),
-    link(ids['04_Accounts'], '📤 4 Ready to Post'),
-    link(ids['05_Posted'], '📦 5 Posted'),
-    link(ids['06_Rejected'], '❌ 6 Rejected'),
-    link(ids['00_Brand'], '🎨 0 Brand Kit'),
+    link(ids['01_Raw'], '📥 New Clips'),
+    link(ids['02_Screened'], '⏸ On Hold'),
+    link(ids['03_Approved'], '✅ Approved'),
+    link(ids['04_Accounts'], '📤 Ready to Post'),
+    link(ids['05_Posted'], '📦 Posted'),
+    link(ids['06_Rejected'], '❌ Rejected'),
+    link(ids['00_Brand'], '🎨 Brand Kit'),
   ]]);
   const c = cols_(panel);
   if (c.DECISION) panel.getRange(HEADER_ROWS, c.DECISION).setNote(

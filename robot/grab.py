@@ -180,11 +180,11 @@ def main():
     except Exception as e:
         errors.append(f"storage check: {e}")
 
-    # --- health line (Control Panel K1, one cell) ---
+    # --- health line (Control Panel G1, one cell) ---
     status = "✅ OK" if not errors else f"⚠ {len(errors)} issue(s): " + " | ".join(errors[:3])
     line = (f"🤖 Robot · {now_et.strftime('%a %I:%M %p').replace(' 0', ' ')} · "
             f"{'🧪 TEST ' if test else ''}grabbed {grabbed} · {status}")
-    g.update_values(sheet, f"'{C.PANEL_TAB}'!K1", [[line[:400]]])
+    g.update_values(sheet, f"'{C.PANEL_TAB}'!G1", [[line[:400]]])
     print(f"Grabbed {grabbed} clip(s). {status}")
 
 
@@ -203,7 +203,7 @@ if __name__ == "__main__":
         try:
             g = Google()
             now = dt.datetime.now(ET).strftime("%a %I:%M %p")
-            g.update_values(os.environ.get("SHEET_ID"), f"'{C.PANEL_TAB}'!K1",
+            g.update_values(os.environ.get("SHEET_ID"), f"'{C.PANEL_TAB}'!G1",
                             [[f"🤖 Robot · ❌ FAILED {now} · {str(e)[:300]}"]])
         except Exception:
             pass
