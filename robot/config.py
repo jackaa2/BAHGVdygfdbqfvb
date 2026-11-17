@@ -32,3 +32,15 @@ FOLDERS = {
 DUPLICATE_ROOTS = ["1WWHteRmD_-S30F2qby53gq9qeRN8riL5"]
 
 CATEGORY_PAGES = 5                     # read up to 500 category clips (big non-English streams crowd the first 100)
+
+ACCOUNT_FOLDERS = {
+    1: "1h7qwmKXlMQE0n0Cgh1faCnSHphWWZjMc",
+    2: "1tnJQG3-Wujd9ABEKyZNq3rmmJMojvJZS",
+    3: "1ZegHScdAhG-jlwsLtF3lfugtSbsw_XkE",
+    4: "1PSBXU5RPMsayYdvkyRFT0wqOYFZQveif",
+    5: "15Ug4UVXgwH1-Ox3UjKduIoD6Vx8KxQwe",
+    6: "1luy_PwOSYeAVpoGURHyBormFrMb8CK5S",
+}
+STYLES_TAB = "Account Styles"
+EDIT_MAX_PER_RUN = 6          # approved clips turned into 6 versions per run
+WHISPER_MODEL = "small.en"    # speech-to-text for captions (free, runs on GitHub)

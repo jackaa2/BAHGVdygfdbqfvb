@@ -123,6 +123,25 @@ class Google:
         self._req("PATCH", f"{DRIVE}/files/{folder_id}", json={"trashed": True})
         return True
 
+    def download(self, file_id, path):
+        r = requests.get(f"{DRIVE}/files/{file_id}", params={"alt": "media"},
+                         headers=self._h(), stream=True, timeout=600)
+        if r.status_code != 200:
+            raise RuntimeError(f"Download failed ({r.status_code}): {r.text[:200]}")
+        with open(path, "wb") as f:
+            for chunk in r.iter_content(1 << 20):
+                f.write(chunk)
+        return path
+
+    def trash(self, file_id):
+        self._req("PATCH", f"{DRIVE}/files/{file_id}", json={"trashed": True})
+
+    def list_children(self, parent_id):
+        r = self._req("GET", f"{DRIVE}/files", params={
+            "q": f"'{parent_id}' in parents and trashed = false", "fields": "files(id,name,mimeType)",
+            "pageSize": 200})
+        return r.json().get("files", [])
+
     def upload(self, path, name, parent_id, mime="video/mp4"):
         """Resumable upload (works for big files)."""
         meta = {"name": name, "parents": [parent_id]}
