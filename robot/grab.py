@@ -61,6 +61,14 @@ def main():
         for cell in row:
             for u in re.findall(r'https?://(?:www\.|clips\.)?(?:twitch\.tv|kick\.com)[^"\s]*', str(cell)):
                 known.add(clip_key(u))
+    try:  # clips deleted with the 🗑 button are remembered here so they never come back
+        for row in g.get_values(sheet, "'Deleted Clips'!A2:B"):
+            if len(row) > 1 and row[1]:
+                known.add(clip_key(str(row[1])))
+            if row:
+                panel.append([row[0]])  # deleted IDs still count, so numbers never repeat
+    except Exception:
+        pass  # tab only exists after the first delete
     today_prefix = now_et.strftime("%m%d")
     # next number = highest number used today + 1 (never reuses an ID, even if rows get deleted)
     nums = [int(m.group(1)) for row in panel if row

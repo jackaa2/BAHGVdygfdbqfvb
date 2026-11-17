@@ -52,6 +52,8 @@ function onOpen() {
     .createMenu('🎬 Clip Hub')
     .addItem('1. First-time setup (folders + links + auto-move)', 'setup')
     .addItem('Re-check all decisions now', 'resyncAll')
+    .addSeparator()
+    .addItem('🗑 Delete all rejected clips…', 'deleteRejected')
     .addToUi();
 }
 
@@ -124,10 +126,66 @@ function onDecisionEdit(e) {
   if (!e || !e.range) return;
   const sh = e.range.getSheet();
   if (sh.getName() !== PANEL) return;
+  if (e.range.getA1Notation() === DELETE_BOX) {
+    if (e.range.getValue() === true) {
+      e.range.setValue(false);
+      deleteRejected();
+    }
+    return;
+  }
   const c = cols_(sh);
   const c1 = e.range.getColumn(), c2 = e.range.getLastColumn();
   if (!c.DECISION || c.DECISION < c1 || c.DECISION > c2) return;
   for (let r = Math.max(e.range.getRow(), HEADER_ROWS + 1); r <= e.range.getLastRow(); r++) processRow_(sh, r, c);
+}
+
+// ---- Delete all rejected clips (button = checkbox in Control Panel M2, or the menu) ----
+const DELETE_BOX = 'M2';
+const DELETED_TAB = 'Deleted Clips'; // hidden list so the robot never grabs a deleted clip again
+
+function deleteRejected() {
+  const ss = SpreadsheetApp.getActive();
+  const sh = ss.getSheetByName(PANEL);
+  const ui = SpreadsheetApp.getUi();
+  const c = cols_(sh);
+  const last = sh.getLastRow();
+  if (last <= HEADER_ROWS || !c.DECISION) { ui.alert('No clips yet.'); return; }
+  const n = sh.getLastColumn();
+  const vals = sh.getRange(HEADER_ROWS + 1, 1, last - HEADER_ROWS, n).getValues();
+  const forms = sh.getRange(HEADER_ROWS + 1, 1, last - HEADER_ROWS, n).getFormulas();
+  const rows = [];
+  vals.forEach((v, i) => { if (String(v[c.DECISION - 1]).trim() === 'Reject') rows.push(i); });
+  if (!rows.length) { ui.alert('Nothing to delete', 'There are no rejected clips.', ui.ButtonSet.OK); return; }
+
+  const ok = ui.alert('Are you sure?',
+    'Delete ' + rows.length + ' rejected clip' + (rows.length > 1 ? 's' : '') + '?\n\n' +
+    'Their rows are removed from the Control Panel and their videos go to the Google Drive trash ' +
+    '(you can still restore them from the trash for 30 days).', ui.ButtonSet.YES_NO);
+  if (ok !== ui.Button.YES) return;
+
+  let log = ss.getSheetByName(DELETED_TAB);
+  if (!log) {
+    log = ss.insertSheet(DELETED_TAB);
+    log.getRange(1, 1, 1, 4).setValues([['Clip ID', 'Clip link', 'Deleted', 'Video']]);
+    log.hideSheet();
+  }
+  const logRows = [], failed = [];
+  rows.forEach(i => {
+    const row = vals[i], f = forms[i];
+    const link = (f.join(' ').match(/https?:\/\/(?:www\.|clips\.)?(?:twitch\.tv|kick\.com)[^"\s]*/) || [''])[0];
+    let video = 'no file';
+    const fileId = c.RAWFILE ? extractId_(sh.getRange(HEADER_ROWS + 1 + i, c.RAWFILE)) : '';
+    if (fileId) {
+      try { DriveApp.getFileById(fileId).setTrashed(true); video = 'trashed'; }
+      catch (err) { video = 'could not trash: ' + err.message; failed.push(row[c.ID - 1]); }
+    }
+    logRows.push([row[c.ID - 1], link, new Date(), video]);
+  });
+  log.getRange(log.getLastRow() + 1, 1, logRows.length, 4).setValues(logRows);
+  rows.slice().reverse().forEach(i => sh.deleteRow(HEADER_ROWS + 1 + i));
+
+  ui.alert('Done', 'Deleted ' + rows.length + ' rejected clip(s).' +
+    (failed.length ? '\n\nCould not trash the video for: ' + failed.join(', ') : ''), ui.ButtonSet.OK);
 }
 
 function resyncAll() {
