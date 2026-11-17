@@ -55,7 +55,7 @@ def main():
         errors.append(f"folder tidy: {e}")
 
     # --- what's already logged (dedupe by any clip link anywhere in the row) ---
-    panel = g.get_values(sheet, f"'{C.PANEL_TAB}'!A{C.HEADER_ROWS + 1}:W", formulas=True)
+    panel = g.get_values(sheet, f"'{C.PANEL_TAB}'!A{C.HEADER_ROWS + 1}:S", formulas=True)
     known = set()
     for row in panel:
         for cell in row:
@@ -161,11 +161,11 @@ def main():
                 errors.append(f"{clip_id}: {e}"); continue
             drive_link = f'=HYPERLINK("https://drive.google.com/file/d/{fid}/view","📄 raw")'
             watch = f'=HYPERLINK("{c["url"]}","▶ watch")'
-            # A ID | B Streamer | C Title | D Watch | E-G Claude | H Decision | I By | J Status
-            # K Views | L Length | M Platform | N Grabbed | O Raw File | P Edited | Q-V Hooks | W Notes
-            row = ([clip_id, safe(c["streamer"]), safe(c["title"]), watch, "", "", "", "", "", "New",
-                         c["views"], c["seconds"], c["platform"], now_et.strftime("%Y-%m-%d %H:%M"),
-                         drive_link, ""] + [""] * 6 + (["🧪 TEST clip (not GTA 6)"] if test else [""]))
+            # A ID | B Streamer | C Title | D Watch | E Score | F Verdict | G Decision | H By | I Status
+            # J Views | K Length | L Platform | M Grabbed | N Raw File | O Edited | P-R Hook 1-3 | S Notes
+            row = ([clip_id, safe(c["streamer"]), safe(c["title"]), watch, "", "", "", "", "New",
+                    c["views"], c["seconds"], c["platform"], now_et.strftime("%Y-%m-%d %H:%M"),
+                    drive_link, ""] + [""] * 3 + (["🧪 TEST clip (not GTA 6)"] if test else [""]))
             try:
                 g.update_values(sheet, f"'{C.PANEL_TAB}'!A{next_row}", [row])
                 next_row += 1; grabbed += 1
