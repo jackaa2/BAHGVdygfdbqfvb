@@ -110,6 +110,7 @@ def make_hook(text, out_path, size=62, max_w=880):
                 x += font.getlength(val)
             else:
                 em = emoji_img(val)
+                print(f"   hook emoji {val!r}: {'drawn' if em is not None else 'MISSING'}")
                 if em is not None:
                     em = em.resize((esz, esz), Image.LANCZOS)
                     img.alpha_composite(em, (int(x + size * 0.05), int(y0 + (box_h - esz) / 2)))
