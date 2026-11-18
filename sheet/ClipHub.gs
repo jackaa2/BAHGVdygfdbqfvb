@@ -142,6 +142,10 @@ function onDecisionEdit(e) {
   if (c.TOPTEXT && c.TOPTEXT >= c1 && c.TOPTEXT <= c2 && c.DECISION) {
     for (let r = Math.max(e.range.getRow(), HEADER_ROWS + 1); r <= e.range.getLastRow(); r++) {
       const top = String(sh.getRange(r, c.TOPTEXT).getValue()).trim();
+      if (top.indexOf('✏️') === 0) {
+        SpreadsheetApp.getActive().toast('Click the cell and type your own top text (emojis ok), then press Enter.', '✏️ Your turn', 8);
+        continue;
+      }
       if (top && String(sh.getRange(r, c.DECISION).getValue()).trim() === 'Approve') {
         if (c.STATUS && String(sh.getRange(r, c.STATUS).getValue()) !== 'Ready to Post') {
           sh.getRange(r, c.STATUS).setValue('Pending');
@@ -252,7 +256,8 @@ function work_() {
   const h1 = c.H1 ? sh.getRange(HEADER_ROWS + 1, c.H1, n, 1).getValues() : top;
   d.forEach((v, i) => {
     if (v[0] !== 'Approve' || st[i][0] === 'Ready to Post') return;
-    if (String(top[i][0]).trim()) out.edit = true;
+    const t = String(top[i][0]).trim();
+    if (t && t.indexOf('✏️') !== 0) out.edit = true;
     else if (!String(h1[i][0]).trim()) out.hooks = true;
   });
   return out;
@@ -341,7 +346,7 @@ function processRow_(sh, r, c) {
     }
     if (decision === 'Approve') {
       const top = c.TOPTEXT ? String(sh.getRange(r, c.TOPTEXT).getValue()).trim() : '';
-      if (top) kickEdit_();
+      if (top && top.indexOf('✏️') !== 0) kickEdit_();
       else { kick_('hooks.yml', 'LAST_HOOK_KICK');
              SpreadsheetApp.getActive().toast('Claude is writing 3 hooks (about 1 min). Then pick one in 🎯 TOP TEXT.', '✅ Approved', 6); }
     }

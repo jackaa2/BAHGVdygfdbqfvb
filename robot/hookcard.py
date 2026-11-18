@@ -20,12 +20,25 @@ def emoji_img(e):
     codes = [f"{ord(ch):x}" for ch in e]
     names = ["-".join(codes), "-".join(c for c in codes if c != "fe0f")]
     os.makedirs(CACHE, exist_ok=True)
-    for n in names:
+    bundled = os.path.join(HERE, "assets", "emoji")
+    for n in names:  # 1) emojis shipped with the robot (the common ones)
+        p = os.path.join(bundled, n + ".png")
+        if os.path.exists(p):
+            return Image.open(p).convert("RGBA")
+    for n in names:  # 2) download anything else (retry once)
         path = os.path.join(CACHE, n + ".png")
         if not os.path.exists(path):
-            try:
-                urllib.request.urlretrieve(TWEMOJI.format(n), path)
-            except Exception:
+            for _ in range(2):
+                try:
+                    req = urllib.request.Request(TWEMOJI.format(n), headers={"User-Agent": "Mozilla/5.0"})
+                    with urllib.request.urlopen(req, timeout=15) as r, open(path, "wb") as f:
+                        f.write(r.read())
+                    break
+                except Exception:
+                    if os.path.exists(path):
+                        os.remove(path)
+            if not os.path.exists(path):
+                print(f"emoji not found: {n}")
                 continue
         try:
             return Image.open(path).convert("RGBA")

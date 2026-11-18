@@ -168,7 +168,7 @@ def main():
                     "range": {"sheetId": gid, "startRowIndex": rn - 1, "endRowIndex": rn,
                               "startColumnIndex": col["top"], "endColumnIndex": col["top"] + 1},
                     "rule": {"condition": {"type": "ONE_OF_LIST", "values": [
-                        {"userEnteredValue": h} for h in hooks + ["(no top text)"]]},
+                        {"userEnteredValue": h} for h in hooks + ["✏️ Type my own (click the cell & type)", "(no top text)"]]},
                         "showCustomUi": True, "strict": False}}}])
                 print(f"{clip_id}: {hooks}")
                 done += 1
