@@ -182,7 +182,13 @@ def make_batch(g, sheet, review, now):
     head, rows = panel(g, sheet)
     ages = [now - (parse_et(review[i][R_ADDED]) or now - dt.timedelta(days=1)) for i in loose]
     oldest = max(ages)
-    if oldest < dt.timedelta(minutes=C.BATCH_MAX_WAIT_MIN) and (being_made(head, rows) or len(loose) < C.BATCH_MIN_CLIPS):
+    if C.DAILY_BATCH_HOUR is not None:
+        # one shift a day: everything made since yesterday goes into ONE reel, built before your review time
+        made_today = any(is_header(r) and str(r[R_BATCH]).startswith(now.strftime("%m%d-")) for r in review)
+        if now.hour < C.DAILY_BATCH_HOUR or made_today:
+            print(f"Batch: {len(loose)} video(s) waiting for the daily reel ({C.DAILY_BATCH_HOUR}:00 ET)")
+            return False
+    elif oldest < dt.timedelta(minutes=C.BATCH_MAX_WAIT_MIN) and (being_made(head, rows) or len(loose) < C.BATCH_MIN_CLIPS):
         print(f"Batch: {len(loose)} video(s) waiting for more before making a reel")
         return False
     loose = loose[:C.BATCH_MAX_CLIPS]
@@ -204,7 +210,7 @@ def make_batch(g, sheet, review, now):
         print(f"reel failed ({e}) - batch made anyway, use each clip's ▶ watch link")
     watch = (f'=HYPERLINK("https://drive.google.com/file/d/{reel_fid}/view","▶ WATCH REEL")' if reel_fid
              else "reel failed - use the ▶ watch links")
-    header = [f"BATCH {bid}", "", f"🎬 BATCH {now:%a %-I:%M %p} · {len(loose)} clips", watch, "", "",
+    header = [f"BATCH {bid}", "", f"🎬 {now:%a %b %-d} · {len(loose)} clips for the next 24h", watch, "", "",
               False, "", now.strftime("%Y-%m-%d %H:%M"),
               "👀 Watch the reel · 👎 bad ones · tick ✅ on this row to POST ALL", "", reel_fid, bid]
     clips = []
@@ -328,9 +334,10 @@ def main():
                                                            "Idempotency-Key": f"{clip_id}-A{a}-{r[R_FILE]}"},
                                              data={"user": user, "platform[]": "youtube",
                                                    "title": title, "description": desc, "tags": tags,
-                                                   "privacyStatus": C.POST_PRIVACY,
-                                                   "scheduled_date": slot.strftime("%Y-%m-%dT%H:%M:00"),
-                                                   "timezone": "America/New_York"},
+                                                   # upload now as private + YouTube's own schedule, so it shows
+                                                   # in YouTube Studio as "Scheduled" right away and goes public at `slot`
+                                                   "privacyStatus": "private",
+                                                   "youtube_publish_at": slot.isoformat()},
                                              files={"video": (os.path.basename(path), f, "video/mp4")}, timeout=600)
                     os.remove(path)
                 except Exception as e:

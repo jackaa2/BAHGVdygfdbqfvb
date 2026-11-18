@@ -426,6 +426,17 @@ function checkAlerts_() {
   const status = String(sh.getRange('G1').getValue());
   if (/FAILED|expired|could not reach/i.test(status)) sendAlert_('🚨 Clip robot: ' + status);
   else if (/⚠/.test(status) && /DRIVE \d+% FULL/.test(status)) sendAlert_('💾 Clip robot: Drive almost full. ' + status);
+  // daily shift: today's reel is waiting (texts from 10 AM, repeats every 3 h until it's approved, never at night)
+  try {
+    const rv = SpreadsheetApp.getActive().getSheetByName('🎬 Review');
+    const hr = Number(Utilities.formatDate(new Date(), 'America/New_York', 'H'));
+    if (rv && hr >= 10 && hr < 22) {
+      const today = 'BATCH ' + Utilities.formatDate(new Date(), 'America/New_York', 'MMdd') + '-';
+      const vals = rv.getRange(4, 1, Math.max(rv.getLastRow() - 3, 1), 10).getValues();
+      const waiting = vals.filter(v => String(v[0]).indexOf(today) === 0 && /^👀/.test(String(v[9]))).length;
+      if (waiting) sendAlert_('🎬 Today\'s GTA 6 reel is ready on the Review tab. Watch it, 👎 the bad ones, tick ✅ POST ALL.');
+    }
+  } catch (e) {}
   // Claude credit running low (estimate on the Analytics tab)
   try {
     const an = SpreadsheetApp.getActive().getSheetByName('📊 Analytics');
