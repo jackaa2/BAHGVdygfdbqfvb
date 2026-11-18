@@ -202,6 +202,7 @@ def main():
                 if not fid:
                     raise RuntimeError("no raw file link")
                 src = g.download(fid, os.path.join(tmp, clip_id + "_raw.mp4"))
+                print(f"   {clip_id} raw: {describe(src)}")
                 words = transcribe(src)
                 from render import probe
                 dur = probe(src)[2]
@@ -280,6 +281,14 @@ def main():
                 put(rownum, "notes", clip_id=clip_id, value=f"⚠ Edit failed (try {n}) {dt.datetime.now(ET):%a %I:%M %p}: {msg[:250]}")
 
 
+def describe(path):
+    """One line about the raw video (helps when a clip misbehaves)."""
+    r = subprocess.run(["ffprobe", "-v", "error", "-show_entries",
+                        "stream=index,codec_type,codec_name,width,height,r_frame_rate,avg_frame_rate,start_time,duration,nb_frames,time_base:format=start_time,duration,size",
+                        "-of", "compact=p=0:nk=0", path], capture_output=True, text=True)
+    return " || ".join(r.stdout.split("\n")).strip()
+
+
 def make_sample(g, sheet, rows, cell, clip_id):
     """TEST: one YouTube channel-1 version of a clip, saved as a GitHub artifact.
     Touches nothing in the sheet or the channel folders."""
@@ -290,6 +299,7 @@ def make_sample(g, sheet, rows, cell, clip_id):
     os.makedirs(out_dir, exist_ok=True)
     with tempfile.TemporaryDirectory() as tmp:
         src = g.download(file_id(cell(r, "raw")), os.path.join(tmp, "raw.mp4"))
+        print("   raw:", describe(src))
         words = transcribe(src)
         from render import probe
         dur = probe(src)[2]
