@@ -76,7 +76,9 @@ def main():
         need[a] -= 1
         per_streamer[s] = per_streamer.get(s, 0) + 1
         picks.append((i, a, score))
+    import time
     for i, a, score in picks:
+        time.sleep(1.5)       # stay under Google's per-minute write limit
         rn = C.HEADER_ROWS + 1 + i
         for h, v in (("✅ YOUR DECISION", "Approve"), ("Status", "Waiting for Hook"),
                      ("Notes", f"🤖 AUTO rush ch{a} {now:%m/%d %-I%p}")):
