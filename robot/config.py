@@ -124,6 +124,7 @@ POST_MODE = "split"           # "split": each clip goes to ONE channel (clips ta
                               # "all":   each clip goes to ALL 5 channels, each with its own hook
 POST_HASHTAGS = "#GTA6 #GTAVI #GTA #shorts"
 # trending tags: titles get as many as fit in 100 characters (rotated per video), description + YouTube tags get more
+MIN_TITLE_TAGS = 4              # every title keeps at least this many tags; long hooks get shortened to fit
 TAG_BANK = ["#GTA6", "#GTAVI", "#GTA", "#gaming", "#streamer", "#twitch", "#kick", "#funny", "#viral", "#fyp",
             "#gtaclips", "#streamerclips"]
 SAME_CLIP_GAP_HOURS = 24      # if a clip goes to more than one channel, its posts are at least this far apart

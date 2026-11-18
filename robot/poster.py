@@ -85,9 +85,15 @@ def title_and_tags(hook, streamer, clip_id):
     core = [t for t in ("#GTA6", "#shorts") if t]
     extra = [t for t in bank if t.lower() not in {c.lower() for c in core}]
     rnd.shuffle(extra)
-    title = hook.strip()[:100]
-    for t in core + extra:
-        if len(title) + 1 + len(t) <= 95:   # a little under 100: emojis can count double
+    LIMIT = 95                       # a little under YouTube's 100: emojis can count double
+    must = core + extra[:C.MIN_TITLE_TAGS - len(core)] if C.MIN_TITLE_TAGS > len(core) else core
+    room = LIMIT - sum(len(t) + 1 for t in must)
+    title = hook.strip()
+    if len(title) > room:            # the hook gets shorter (at a word break) so the tags always fit
+        cut = title[:room].rsplit(" ", 1)[0].rstrip(" ,.-!?")
+        title = cut if len(cut) >= room // 2 else title[:room].rstrip()
+    for t in must + [t for t in extra if t not in must]:
+        if len(title) + 1 + len(t) <= LIMIT:
             title += " " + t
     streamer_tag = "#" + "".join(ch for ch in streamer if ch.isalnum())
     desc_tags = " ".join(dict.fromkeys(core + [streamer_tag] + extra[:15]))
