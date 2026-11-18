@@ -10,8 +10,11 @@ on:
         description: "Only clips grabbed in the last N hours"
         default: "24"
       top_up:
-        description: "yes = count videos already waiting on Review"
+        description: "yes = count this rush's earlier picks"
         default: "no"
+      channels:
+        description: "Only these channels, e.g. 1,2,5 (blank = all)"
+        default: ""
 
 permissions:
   contents: read
@@ -34,6 +37,7 @@ jobs:
           RUSH_PER_CHANNEL: ${{ inputs.per_channel }}
           RUSH_HOURS: ${{ inputs.hours }}
           RUSH_TOP_UP: ${{ inputs.top_up }}
+          RUSH_CHANNELS: ${{ inputs.channels }}
           GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
           GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
