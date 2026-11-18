@@ -6,7 +6,7 @@ import tempfile
 
 FONT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fonts", "TitanOne-Regular.ttf")
 W, H, FPS = 540, 960, 30
-ENC = ["-c:v", "libx264", "-preset", "veryfast", "-crf", "28", "-pix_fmt", "yuv420p", "-r", str(FPS),
+ENC = ["-c:v", "libx264", "-preset", "ultrafast", "-crf", "28", "-pix_fmt", "yuv420p", "-r", str(FPS),
        "-video_track_timescale", "15360", "-c:a", "aac", "-b:a", "96k", "-ar", "44100", "-ac", "2"]
 
 
@@ -58,5 +58,5 @@ def make_reel(items, out):
         # one clean re-encode of the whole reel: every player (Drive's too) plays it start to finish
         subprocess.run(["ffmpeg", "-v", "error", "-y", "-fflags", "+genpts", "-f", "concat", "-safe", "0",
                         "-i", lst, "-af", "aresample=async=1:first_pts=0", *ENC, "-movflags", "+faststart", out],
-                       check=True, capture_output=True, text=True, timeout=1500)
+                       check=True, capture_output=True, text=True, timeout=3600)
     return out

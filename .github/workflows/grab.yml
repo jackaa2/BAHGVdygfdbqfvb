@@ -103,14 +103,9 @@ jobs:
           GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
           SHEET_ID: ${{ secrets.SHEET_ID }}
         run: python -u analytics.py
-      - name: Post the videos you approved on the Review tab (and do redos)
+      - name: Start the posting job (Review batches, reels, scheduling)
         if: always() && inputs.check_posting != 'yes'
         continue-on-error: true
-        working-directory: robot
         env:
-          UPLOAD_POST_KEY: ${{ secrets.UPLOAD_POST_KEY }}
-          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
-          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
-          GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
-          SHEET_ID: ${{ secrets.SHEET_ID }}
-        run: python -u poster.py
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run post.yml -R ${{ github.repository }}
