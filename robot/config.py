@@ -130,3 +130,6 @@ ANALYTICS_TAB = "📊 Analytics"  # channel stats, top streamers, top Shorts, 30
 ANALYTICS_EVERY_HOURS = 2
 REVIEW_TAB = "🎬 Review"        # every finished video waits here until someone ticks POST IT
 REVIEW_HEADER_ROW = 3            # rows 1-2 are the dashboard
+BATCH_MAX_CLIPS = 12            # most clips in one review reel
+BATCH_MAX_WAIT_MIN = 90         # make the batch anyway if a finished video has waited this long
+AUTO_POST_AFTER_HOURS = None    # e.g. 4: a batch nobody touched posts by itself after 4 h (👎 ones skipped)

@@ -18,7 +18,7 @@ import config as C
 from google_api import Google
 from render import FONTS_DIR, render
 from speaker import keep_streamer
-from channels import channel_hooks, add_review_rows
+from channels import channel_hooks, add_review_rows, review_row
 from styles import HOOK_COLORS, HOOK_FOR
 
 ET = ZoneInfo("America/New_York")
@@ -256,10 +256,8 @@ def main():
                         m = re.search(r"_A(\d)\.mp4$", name)
                         if m:
                             a = int(m.group(1))
-                            review.append([clip_id, a, C.CHANNELS[a], per_channel.get(a, cell(r, "top")),
-                                           f'=HYPERLINK("https://drive.google.com/file/d/{vid}/view","▶ watch")',
-                                           cell(r, "streamer"), False, False, False, "👀 Watch it, then tick POST IT",
-                                           "", vid])
+                            review.append(review_row(clip_id, a, per_channel.get(a, cell(r, "top")),
+                                                     cell(r, "streamer"), vid))
                 if review:
                     add_review_rows(g, sheet, review)
                 if PREVIEWS and os.environ.get("PREVIEW_UPLOAD") == "yes":
