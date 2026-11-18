@@ -139,14 +139,14 @@ def main():
     days = sorted(daily)[-30:]
     table = [[d] + [daily[d].get(a, "") for a in sorted(C.CHANNELS)] for d in days]
     table += [[""] * 6] * (30 - len(table))
-    g.update_values(sheet, f"'{C.ANALYTICS_TAB}'!A28:F57", table)
+    g.update_values(sheet, f"'{C.ANALYTICS_TAB}'!Q28:V57", table)     # hidden columns (the chart shows it)
     if days:   # (re)attach the 5 channel lines to the chart now that there is data
         gid = g.sheet_gid(sheet, C.ANALYTICS_TAB)
         src = lambda c: {"sourceRange": {"sources": [{"sheetId": gid, "startRowIndex": 26, "endRowIndex": 57,
-                                                      "startColumnIndex": c, "endColumnIndex": c + 1}]}}
+                                                      "startColumnIndex": 16 + c, "endColumnIndex": 17 + c}]}}
         try:
             g.batch_update(sheet, [{"updateChartSpec": {"chartId": CHART_ID, "spec": {
-                "title": "Daily views per channel (30 days)",
+                "title": "Daily views per channel (last 30 days)", "hiddenDimensionStrategy": "SHOW_ALL",
                 "basicChart": {"chartType": "LINE", "legendPosition": "BOTTOM_LEGEND", "headerCount": 1,
                                "domains": [{"domain": src(0)}],
                                "series": [{"series": src(c), "targetAxis": "LEFT_AXIS"} for c in range(1, 6)]}}}}])

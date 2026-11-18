@@ -74,6 +74,7 @@ function onEdit(e) {
 }
 
 function onOpen() {
+  try { SpreadsheetApp.getActive().getSheetByName('🎬 Review').activate(); } catch (e) {}
   SpreadsheetApp.getUi()
     .createMenu('🎬 Clip Hub')
     .addItem('1. First-time setup (folders + links + auto-move)', 'setup')
@@ -457,9 +458,9 @@ function checkAlerts_() {
     const hr = Number(Utilities.formatDate(new Date(), 'America/New_York', 'H'));
     if (rv && hr >= 10 && hr < 22) {
       const today = 'BATCH ' + Utilities.formatDate(new Date(), 'America/New_York', 'MMdd') + '-';
-      const vals = rv.getRange(4, 1, Math.max(rv.getLastRow() - 3, 1), 10).getValues();
-      const waiting = vals.filter(v => String(v[0]).indexOf(today) === 0 && /^👀/.test(String(v[9]))).length;
-      if (waiting) sendAlert_('🎬 Today\'s GTA 6 reel is ready on the Review tab. Watch it, 👎 the bad ones, tick ✅ POST ALL.');
+      const vals = rv.getRange(4, 1, Math.max(rv.getLastRow() - 3, 1), 14).getValues();
+      const waiting = vals.filter(v => String(v[0]).indexOf(today) === 0 && /^👀/.test(String(v[10]))).length;
+      if (waiting) sendAlert_('🎬 Today\'s GTA 6 reel is ready on the Review tab. Watch it, 👎 the bad ones, then tick ✅ + ☑ on the batch row.');
     }
   } catch (e) {}
   // Claude credit running low (estimate on the Analytics tab)
