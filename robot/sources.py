@@ -64,6 +64,19 @@ class Twitch:
         } for c in self._get("clips", p, pages=pages)]
 
 
+def parse_time(value):
+    """Kick sends times like 2026-11-17T20:07:57.624+00:00 or ...Z, with 0-6 decimals."""
+    t = str(value or "").strip().replace("Z", "+00:00")
+    m = re.match(r"(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d)(?:\.(\d+))?([+-]\d\d:?\d\d)?", t)
+    if not m:
+        return None
+    frac = (m.group(2) or "0")[:6].ljust(6, "0")
+    tz = m.group(3) or "+00:00"
+    if ":" not in tz:
+        tz = tz[:3] + ":" + tz[3:]
+    return dt.datetime.fromisoformat(f"{m.group(1)}.{frac}{tz}")
+
+
 def kick_clips(slug, since):
     """Best effort: Kick has no official clips API. Returns [] (and the error text) if blocked."""
     try:
@@ -73,7 +86,9 @@ def kick_clips(slug, since):
             return [], f"Kick {slug}: HTTP {r.status_code}"
         out = []
         for c in r.json().get("clips", []):
-            created = dt.datetime.fromisoformat(str(c.get("created_at", "")).replace("Z", "+00:00")[:25])
+            created = parse_time(c.get("created_at"))
+            if created is None:
+                continue
             if created.tzinfo is None:
                 created = created.replace(tzinfo=dt.timezone.utc)
             if created < since:
