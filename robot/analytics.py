@@ -111,7 +111,7 @@ def main():
             except requests.RequestException as e:
                 problems.append(f"ch{a} {e}")
         wt = yt.get("watch_time_minutes")
-        rows.append([num(yt.get("followers")), num(yt.get("views")), num(yt.get("likes")), num(yt.get("comments")),
+        rows.append([num(yt.get("followers")), num(yt.get("views") or yt.get("impressions")), num(yt.get("likes")), num(yt.get("comments")),
                      round(float(wt) / 60, 1) if isinstance(wt, (int, float)) else "",
                      num(yt.get("average_view_duration_seconds"))])
         for d, v in series(yt.get("reach_timeseries")).items():
