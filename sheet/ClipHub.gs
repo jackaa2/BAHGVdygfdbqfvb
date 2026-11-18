@@ -172,11 +172,42 @@ function onDecisionEdit(e) {
       if (cut === -1) { box.setValue(false); SpreadsheetApp.getActive().toast('✂️ CUT must look like 0:05-0:32 (or leave it blank).', '🚀 Not yet', 6); continue; }
       if (c.STATUS && String(sh.getRange(r, c.STATUS).getValue()) !== 'Ready to Post') sh.getRange(r, c.STATUS).setValue('Pending');
       kickEdit_();
-      SpreadsheetApp.getActive().toast('Making the 6 versions now (3-5 min).', '🎬 Sent', 5);
+      SpreadsheetApp.getActive().toast('Making the 10 versions now (1-3 min).', '🎬 Sent', 5);
     }
   }
   if (!c.DECISION || c.DECISION < c1 || c.DECISION > c2) return;
-  for (let r = Math.max(e.range.getRow(), HEADER_ROWS + 1); r <= e.range.getLastRow(); r++) processRow_(sh, r, c);
+  for (let r = Math.max(e.range.getRow(), HEADER_ROWS + 1); r <= e.range.getLastRow(); r++) {
+    processRow_(sh, r, c);
+    if (c.ID && String(sh.getRange(r, c.DECISION).getValue()).trim() === 'Reject') stampReject_(sh.getRange(r, c.ID).getValue());
+  }
+}
+
+// ---- Rejected clips delete themselves 10 minutes after you reject them ----
+const REJECT_AFTER_MIN = 10;
+function rejectTimes_() {
+  try { return JSON.parse(PropertiesService.getScriptProperties().getProperty('REJECT_TIMES') || '{}'); } catch (e) { return {}; }
+}
+function stampReject_(id) {
+  id = String(id || '').trim(); if (!id) return;
+  const t = rejectTimes_(); if (!t[id]) { t[id] = Date.now(); PropertiesService.getScriptProperties().setProperty('REJECT_TIMES', JSON.stringify(t)); }
+}
+function autoDeleteRejected_() {
+  const sh = SpreadsheetApp.getActive().getSheetByName(PANEL);
+  const c = cols_(sh);
+  const last = sh.getLastRow();
+  if (last <= HEADER_ROWS || !c.DECISION || !c.ID) return;
+  const vals = sh.getRange(HEADER_ROWS + 1, 1, last - HEADER_ROWS, sh.getLastColumn()).getValues();
+  const t = rejectTimes_(), now = Date.now(), keep = {};
+  let due = false;
+  vals.forEach(v => {
+    const id = String(v[c.ID - 1]).trim();
+    if (id && String(v[c.DECISION - 1]).trim() === 'Reject') {
+      keep[id] = t[id] || now;                       // first time we see it: start its 10 minutes now
+      if (now - keep[id] >= REJECT_AFTER_MIN * 60 * 1000) due = true;
+    }
+  });
+  PropertiesService.getScriptProperties().setProperty('REJECT_TIMES', JSON.stringify(keep));
+  if (due) deleteRejected_(true, id => keep[id] && now - keep[id] >= REJECT_AFTER_MIN * 60 * 1000, true);
 }
 
 // ---- Delete all rejected clips (button = checkbox in Control Panel M2, or the menu) ----
@@ -193,10 +224,10 @@ function countRejected_() {
 
 function deleteRejected() { deleteRejected_(false); }   // from the menu: asks with a popup
 
-function deleteRejected_(confirmed) {
+function deleteRejected_(confirmed, pick, quiet) {
   const ss = SpreadsheetApp.getActive();
   const sh = ss.getSheetByName(PANEL);
-  const say = (t, m) => { if (confirmed) ss.toast(m, t, 8); else SpreadsheetApp.getUi().alert(t, m, SpreadsheetApp.getUi().ButtonSet.OK); };
+  const say = (t, m) => { if (quiet) return; if (confirmed) ss.toast(m, t, 8); else SpreadsheetApp.getUi().alert(t, m, SpreadsheetApp.getUi().ButtonSet.OK); };
   const c = cols_(sh);
   const last = sh.getLastRow();
   if (last <= HEADER_ROWS || !c.DECISION) { say('🗑', 'No clips yet.'); return; }
@@ -204,7 +235,9 @@ function deleteRejected_(confirmed) {
   const vals = sh.getRange(HEADER_ROWS + 1, 1, last - HEADER_ROWS, n).getValues();
   const forms = sh.getRange(HEADER_ROWS + 1, 1, last - HEADER_ROWS, n).getFormulas();
   const rows = [];
-  vals.forEach((v, i) => { if (String(v[c.DECISION - 1]).trim() === 'Reject') rows.push(i); });
+  vals.forEach((v, i) => {
+    if (String(v[c.DECISION - 1]).trim() === 'Reject' && (!pick || pick(String(v[c.ID - 1]).trim()))) rows.push(i);
+  });
   if (!rows.length) { say('Nothing to delete', 'There are no rejected clips.'); return; }
 
   const ui = confirmed ? null : SpreadsheetApp.getUi();
@@ -309,6 +342,7 @@ function robotTick() {
     if (code === 204) p.setProperty('LAST_GRAB', String(Date.now()));
     else timerProblem_(code);
   }
+  try { autoDeleteRejected_(); } catch (e) {}
   const w = work_();
   if (w.hooks) dispatch_('hooks.yml');
   if (w.edit) dispatch_('edit.yml');
