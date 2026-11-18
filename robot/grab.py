@@ -143,13 +143,22 @@ def main():
     # --- tracked streamers from the Streamers + Links tab ---
     streamers = g.get_values(sheet, f"'{C.STREAMERS_TAB}'!A2:J")
     tw_logins, kick_slugs = set(), set()
+    tier_of = {}  # streamer login / name (lowercase, no spaces) -> 1, 2, 3 (T1 = biggest)
+
+    def norm(x):
+        return re.sub(r"[^a-z0-9]", "", str(x or "").lower())
+
     for row in streamers:
         cells = " ".join(str(c) for c in row)
+        t = re.match(r"\s*T?(\d)", str(row[0])) if row else None
+        tier = int(t.group(1)) if t else 3
+        if len(row) > 1 and row[1]:
+            tier_of[norm(row[1])] = tier
         for link in re.findall(r"https?://\S+", cells):
             if "twitch.tv/" in link:
-                tw_logins.add(slug_from_link(link, "twitch.tv"))
+                lg = slug_from_link(link, "twitch.tv"); tw_logins.add(lg); tier_of[norm(lg)] = tier
             elif "kick.com/" in link:
-                kick_slugs.add(slug_from_link(link, "kick.com"))
+                sl = slug_from_link(link, "kick.com"); kick_slugs.add(sl); tier_of[norm(sl)] = tier
     tw_logins.discard(None); kick_slugs.discard(None)
 
     # --- collect candidates ---
@@ -180,11 +189,14 @@ def main():
     # --- filter, dedupe, best first ---
     seen, picks = set(), []
     why = {"not GTA 6": 0, "already have": 0, "too few views": 0, "wrong length": 0, "not English": 0}
-    def rank(c):  # most views first; streamers on our list get a boost; prefer clips <= 25 s
-        boost = C.TRACKED_BOOST if c.get("tracked") else 1.0
-        return c["views"] * boost * (1.0 if c["seconds"] <= C.PREFERRED_SECONDS else 0.7)
+    def rank(c):
+        """Top streamers first (T1 like Kai Cenat / xQc, then T2, T3, then everyone else),
+        most views first inside each group; clips over 25 s need ~40% more views."""
+        tier = tier_of.get(norm(c["streamer"]), 9)
+        score = c["views"] * (1.0 if c["seconds"] <= C.PREFERRED_SECONDS else 0.7)
+        return (tier, -score)
 
-    for c in sorted(cands, key=rank, reverse=True):
+    for c in sorted(cands, key=rank):
         if c.get("tracked") and not is_gta(c, gta):
             why["not GTA 6"] += 1; continue
         if clip_key(c["url"]) in known or clip_key(c["url"]) in seen:
