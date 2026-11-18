@@ -129,3 +129,4 @@ POSTS_TAB = "📒 Posts"          # permanent log of every Short we booked (+ it
 ANALYTICS_TAB = "📊 Analytics"  # channel stats, top streamers, top Shorts, 30-day chart
 ANALYTICS_EVERY_HOURS = 2
 REVIEW_TAB = "🎬 Review"        # every finished video waits here until someone ticks POST IT
+REVIEW_HEADER_ROW = 3            # rows 1-2 are the dashboard

@@ -76,7 +76,7 @@ def do_redos(g, sheet, review):
     gid = g.sheet_gid(sheet, C.REVIEW_TAB)
     idx = [i for i, r in enumerate(review) if str(r[R_ID]).strip() in redo]
     g.batch_update(sheet, [{"deleteDimension": {"range": {"sheetId": gid, "dimension": "ROWS",
-                                                          "startIndex": 1 + i, "endIndex": 2 + i}}}
+                                                          "startIndex": C.REVIEW_HEADER_ROW + i, "endIndex": C.REVIEW_HEADER_ROW + 1 + i}}}
                            for i in sorted(idx, reverse=True)])
     return [r for i, r in enumerate(review) if i not in set(idx)]
 
@@ -95,7 +95,7 @@ def tidy(g, sheet, review, now):
                 pass
     if old:
         g.batch_update(sheet, [{"deleteDimension": {"range": {"sheetId": gid, "dimension": "ROWS",
-                                                              "startIndex": 1 + i, "endIndex": 2 + i}}}
+                                                              "startIndex": C.REVIEW_HEADER_ROW + i, "endIndex": C.REVIEW_HEADER_ROW + 1 + i}}}
                                for i in sorted(old, reverse=True)])
 
 
@@ -139,10 +139,10 @@ def backfill(g, sheet, review):
 def main():
     sheet = os.environ["SHEET_ID"]
     g = Google()
-    review = [r + [""] * (12 - len(r)) for r in (g.get_values(sheet, f"'{C.REVIEW_TAB}'!A2:L", formulas=True) or [])]
+    review = [r + [""] * (12 - len(r)) for r in (g.get_values(sheet, f"'{C.REVIEW_TAB}'!A{C.REVIEW_HEADER_ROW + 1}:L", formulas=True) or [])]
     review = do_redos(g, sheet, review)
     if backfill(g, sheet, review):
-        review = [r + [""] * (12 - len(r)) for r in (g.get_values(sheet, f"'{C.REVIEW_TAB}'!A2:L", formulas=True) or [])]
+        review = [r + [""] * (12 - len(r)) for r in (g.get_values(sheet, f"'{C.REVIEW_TAB}'!A{C.REVIEW_HEADER_ROW + 1}:L", formulas=True) or [])]
 
     key = os.environ.get("UPLOAD_POST_KEY")
     if not (C.POSTING_ENABLED and key):
@@ -161,6 +161,23 @@ def main():
         except (ValueError, IndexError):
             pass
     gap, first = dt.timedelta(hours=C.POST_EVERY_HOURS), now + dt.timedelta(minutes=15)
+    booked = {a: set() for a in C.CHANNELS}
+    for p in g.get_values(sheet, f"'{C.POSTS_TAB}'!B2:H") or []:
+        try:
+            booked[int(p[0])].add(dt.datetime.strptime(str(p[6])[:16], "%Y-%m-%d %H:%M").replace(tzinfo=ET))
+        except (ValueError, IndexError, KeyError):
+            pass
+
+    def next_slot(a, after):
+        """Fixed timetable: every POST_EVERY_HOURS, each channel offset a little so they don't all post
+        at the same minute (ch1 :00, ch2 +36 min, ch3 +72 ...). First free slot after `after`."""
+        step = C.POST_EVERY_HOURS * 60
+        offset = (a - 1) * step // len(C.CHANNELS)
+        day0 = after.replace(hour=0, minute=0, second=0, microsecond=0)
+        t = day0 + dt.timedelta(minutes=offset)
+        while t < after or t in booked[a]:
+            t += dt.timedelta(minutes=step)
+        return t
 
     head, rows = panel(g, sheet)
     todo = [(i, r) for i, r in enumerate(review) if ticked(r[R_POST]) and not ticked(r[R_REDO])
@@ -170,11 +187,11 @@ def main():
         for i, r in todo:
             clip_id, a = str(r[R_ID]).strip(), int(r[R_CH])
             user = C.UPLOAD_POST_USERS.get(a)
-            rn = i + 2
+            rn = i + C.REVIEW_HEADER_ROW + 1
             if not user:
                 g.update_values(sheet, f"'{C.REVIEW_TAB}'!J{rn}", [[f"⚠️ No Upload-Post profile set for channel {a}"]])
                 continue
-            slot = max(first, last[a] + gap) if last[a] else first
+            slot = next_slot(a, first)
             # the same clip never goes out on two channels close together (so YouTube doesn't see
             # copies of each other): keep it SAME_CLIP_GAP_HOURS away from its other bookings
             spread = dt.timedelta(hours=C.SAME_CLIP_GAP_HOURS)
@@ -182,7 +199,7 @@ def main():
                 clash = [t for t in clip_times.get(clip_id, []) if abs(t - slot) < spread]
                 if not clash:
                     break
-                slot = max(clash) + spread
+                slot = next_slot(a, max(clash) + spread)
             path = g.download(str(r[R_FILE]).strip(), os.path.join(tmp, f"{clip_id}_A{a}.mp4"))
             hook = str(r[R_HOOK]).strip() or f"{r[R_STREAMER]} in GTA 6"
             title = (hook + " #shorts")[:100]
@@ -214,10 +231,10 @@ def main():
             g.update_values(sheet, f"'{C.REVIEW_TAB}'!J{rn}:K{rn}",
                             [[f"📅 Scheduled {slot:%a %-I:%M %p}", slot.strftime("%Y-%m-%d %H:%M")]])
             set_panel(g, sheet, head, rows, clip_id, {"Status": "Scheduled"})
-            last[a] = max(last[a], slot) if last[a] else slot
+            booked[a].add(slot)
             clip_times.setdefault(clip_id, []).append(slot)
             print(f"{clip_id} -> channel {a} at {slot:%a %I:%M %p}")
-    tidy(g, sheet, g.get_values(sheet, f"'{C.REVIEW_TAB}'!A2:L") or [], now)
+    tidy(g, sheet, g.get_values(sheet, f"'{C.REVIEW_TAB}'!A{C.REVIEW_HEADER_ROW + 1}:L") or [], now)
 
 
 if __name__ == "__main__":

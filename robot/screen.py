@@ -18,7 +18,11 @@ from google_api import Google
 API = "https://api.anthropic.com/v1/messages"
 MODELS = ["claude-haiku-5-5", "claude-sonnet-5-5"]   # fast + cheap first, fallback second
 MAX_PER_RUN = 25
-AUTO_TAG = "🤖 AUTO"     # Notes start with this on clips the robot picked by itself
+AUTO_TAG = "🤖 AUTO"
+# $ per million tokens (input, output) - for the credit counter on the Analytics tab
+PRICES = {"claude-haiku-5-5": (0.10, 0.50), "claude-sonnet-5-5": (2.00, 10.00)}
+SPENT = {"usd": 0.0}
+CREDIT_OUT = {"hit": False}     # Notes start with this on clips the robot picked by itself
 
 PROMPT = """You screen clips for a group of faceless GTA 6 streamer-clips YouTube Shorts channels.
 The best posts are funny, shocking or hype streamer moments, ideally about GTA 6, that hook in the first second.
@@ -91,6 +95,12 @@ def ask_claude(key, prompt, imgs):
             json={"model": model, "max_tokens": 2000, "messages": [{"role": "user", "content": content}]})
         if r.status_code == 200:
             body = r.json()
+            u = body.get("usage") or {}
+            tin = sum(int(u.get(k) or 0) for k in ("input_tokens", "cache_read_input_tokens", "cache_creation_input_tokens"))
+            pin, pout = PRICES.get(model, PRICES["claude-sonnet-5-5"])
+            if model.startswith("claude-haiku") and tin > 100_000:
+                pin, pout = 0.50, 2.50
+            SPENT["usd"] += tin * pin / 1e6 + int(u.get("output_tokens") or 0) * pout / 1e6
             text = "".join(b.get("text", "") for b in body.get("content", []))
             stop = body.get("stop_reason")
             m = re.search(r"\{.*\}", text, re.S)
@@ -107,9 +117,33 @@ def ask_claude(key, prompt, imgs):
             last = f"{model}: no hooks in reply (stop={stop}): {text[:200]!r}"
             continue
         last = f"{model}: {r.status_code} {r.text[:200]}"
+        if "credit balance" in r.text.lower():
+            CREDIT_OUT["hit"] = True
+            break
         if r.status_code in (401, 403):
             break  # bad key: no point trying another model
     raise RuntimeError(last)
+
+
+def track_credit(g, sheet):
+    """Analytics tab N4:O8: you type your Claude balance in O4 whenever you top up; the robot adds up what
+    each run costs in O5 (and starts again from 0 whenever O4 changes). O6 = what's left."""
+    vals = g.get_values(sheet, f"'{C.ANALYTICS_TAB}'!O4:O8") or []
+    vals = [str(v[0]).strip() if v else "" for v in vals] + [""] * 5
+    money = lambda v: float(str(v).replace("$", "").replace(",", "") or 0)
+    try:
+        topped, spent, seen = money(vals[0]), money(vals[1]), vals[4]
+    except ValueError:
+        return
+    if vals[0] != seen:          # new balance typed in: start counting again
+        spent = 0.0
+        g.update_values(sheet, f"'{C.ANALYTICS_TAB}'!O8", [[vals[0]]])
+    spent += SPENT["usd"]
+    g.update_values(sheet, f"'{C.ANALYTICS_TAB}'!O5", [[round(spent, 4)]])
+    if CREDIT_OUT["hit"]:
+        g.update_values(sheet, f"'{C.PANEL_TAB}'!G1",
+                        [["🤖 Robot · ❌ FAILED: Claude credit ran out - top up at console.anthropic.com"]])
+    print(f"Claude cost this run ${SPENT['usd']:.4f}; since last top-up ${spent:.2f} of ${topped:.2f}")
 
 
 def col_letter(i):
@@ -225,6 +259,10 @@ def main():
                 except Exception:
                     pass
     print(f"Wrote hooks for {done} clip(s)")
+    try:
+        track_credit(g, sheet)
+    except Exception as e:
+        print(f"credit counter: {e}")
     if sent and os.environ.get("GITHUB_OUTPUT"):
         with open(os.environ["GITHUB_OUTPUT"], "a") as f:
             f.write(f"auto_sent={sent}\n")

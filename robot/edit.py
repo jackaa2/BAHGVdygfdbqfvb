@@ -314,7 +314,7 @@ def assign_channels():
     if _turn["n"] is None:   # continue the rotation from everything booked / waiting so far
         g, sheet = Google(), os.environ["SHEET_ID"]
         done = len(g.get_values(sheet, f"'{C.POSTS_TAB}'!A2:A") or [])
-        waiting = len(g.get_values(sheet, f"'{C.REVIEW_TAB}'!A2:A") or [])
+        waiting = len(g.get_values(sheet, f"'{C.REVIEW_TAB}'!A{C.REVIEW_HEADER_ROW + 1}:A") or [])
         _turn["n"] = done + waiting
     a = chans[_turn["n"] % len(chans)]
     _turn["n"] += 1
