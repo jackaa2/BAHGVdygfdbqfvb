@@ -149,10 +149,21 @@ function onDecisionEdit(e) {
   }
   const c = cols_(sh);
   const c1 = e.range.getColumn(), c2 = e.range.getLastColumn();
+  if (c.TOPTEXT && c.TOPTEXT >= c1 && c.TOPTEXT <= c2 && c.DECISION && c.STATUS) {
+    for (let r = Math.max(e.range.getRow(), HEADER_ROWS + 1); r <= e.range.getLastRow(); r++) refreshStatus_(sh, c, r);
+  }
   if (c.SEND && c.SEND >= c1 && c.SEND <= c2 && c.DECISION) {
     for (let r = Math.max(e.range.getRow(), HEADER_ROWS + 1); r <= e.range.getLastRow(); r++) {
       const box = sh.getRange(r, c.SEND);
-      if (box.getValue() !== true) continue;
+      if (box.getValue() !== true) {
+        // once sent it stays sent
+        const st = c.STATUS ? String(sh.getRange(r, c.STATUS).getValue()) : '';
+        if (e.oldValue === 'TRUE' || st === 'Pending' || st === 'Ready to Post') {
+          box.setValue(true);
+          SpreadsheetApp.getActive().toast('Already sent: it can\'t be unsent.', '🚀 Sent', 5);
+        }
+        continue;
+      }
       const approved = String(sh.getRange(r, c.DECISION).getValue()).trim() === 'Approve';
       const top = c.TOPTEXT ? String(sh.getRange(r, c.TOPTEXT).getValue()).trim() : '';
       if (!approved) { box.setValue(false); SpreadsheetApp.getActive().toast('Approve the clip first.', '🚀 Not yet', 5); continue; }
@@ -518,6 +529,16 @@ function secs_(v) {
   return /^\d+(\.\d+)?$/.test(t) ? Number(t) : -1;
 }
 
+// Waiting for Hook -> Waiting to Send once approved + top text is set (and not sent yet)
+function refreshStatus_(sh, c, r) {
+  const st = sh.getRange(r, c.STATUS);
+  const cur = String(st.getValue());
+  if (cur === 'Pending' || cur === 'Ready to Post') return;
+  if (String(sh.getRange(r, c.DECISION).getValue()).trim() !== 'Approve') return;
+  const top = String(sh.getRange(r, c.TOPTEXT).getValue()).trim();
+  st.setValue(top ? 'Waiting to Send' : 'Waiting for Hook');
+}
+
 function kick_(workflow, key) {
   // at most one start per 45 s per robot, even if several clips change at once
   const p = PropertiesService.getScriptProperties();
@@ -545,6 +566,7 @@ function processRow_(sh, r, c) {
       if (!(later && decision === 'Approve')) {
         status.setValue(rule.status);
         if (decision !== 'Approve' && c.SEND) sh.getRange(r, c.SEND).setValue(false);
+        if (decision === 'Approve' && c.TOPTEXT) refreshStatus_(sh, c, r);
       }
     }
     if (decision === 'Approve') {
