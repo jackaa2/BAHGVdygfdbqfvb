@@ -237,13 +237,13 @@ def main():
                 next_row = C.HEADER_ROWS + 1 + last + 1
                 g.update_values(sheet, f"'{C.PANEL_TAB}'!A{next_row}", [row])
                 grabbed += 1
-                try:  # Approve/Reject/Hold dropdown only on rows that have a clip
+                try:  # Approve/Reject dropdown only on rows that have a clip
                     gid = g.sheet_gid(sheet, C.PANEL_TAB)
                     g.batch_update(sheet, [{"setDataValidation": {
                         "range": {"sheetId": gid, "startRowIndex": next_row - 1, "endRowIndex": next_row,
                                   "startColumnIndex": 6, "endColumnIndex": 7},
                         "rule": {"condition": {"type": "ONE_OF_LIST", "values": [
-                            {"userEnteredValue": v} for v in ("Approve", "Reject", "Hold")]},
+                            {"userEnteredValue": v} for v in ("Approve", "Reject")]},
                             "showCustomUi": True, "strict": True}}}])
                 except Exception as e:
                     errors.append(f"{clip_id}: dropdown: {e}")
