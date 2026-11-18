@@ -35,9 +35,10 @@ Reply with ONLY this JSON, nothing else:
 {{"hooks": ["<hook 1>", "<hook 2>", "<hook 3>"]}}
 
 Hook rules: 3 different on-screen top lines for the post, each max 45 characters, punchy, curiosity or
-reaction style (e.g. "Kai was NOT ready for this", "Speed broke the game in 5 seconds"), use the streamer's
-name when it helps, no emojis, no hashtags, no quotes, nothing false about what happens in the clip.
-Make the 3 hooks different angles (reaction, curiosity, bold claim). Keep them clean: nothing hateful or sexual."""
+reaction style (e.g. "Kai was NOT ready for this 😭", "Speed broke the game in 5 seconds"), use the streamer's
+name when it helps, no hashtags, no quotes, nothing false about what happens in the clip.
+Make the 3 hooks different angles (reaction, curiosity, bold claim). End ONE or two of the hooks with
+one fitting emoji (like 😭 💀 😂 🔥 😳 🤯); leave the others without emoji. Keep them clean: nothing hateful or sexual."""
 
 
 def frames(path, tmp, n=4):
