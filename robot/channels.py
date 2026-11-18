@@ -26,16 +26,16 @@ def review_row(clip_id, a, hook, streamer, file_id):
     now = dt.datetime.now(ZoneInfo("America/New_York"))
     return [clip_id, a, f"Ch{a} · {C.CHANNELS.get(a, '')}", hook,
             f'=HYPERLINK("https://drive.google.com/file/d/{file_id}/view","▶ watch")', streamer,
-            "", False, now.strftime("%Y-%m-%d %H:%M"), "👀 In the next batch reel", "", file_id, ""]
+            False, False, False, now.strftime("%Y-%m-%d %H:%M"), "👀 In the next batch reel", "", file_id, ""]
 
 
 def add_review_rows(g, sheet, rows):
     """Finished videos go to the Review tab; they get grouped into a batch reel there."""
-    where = g.append_rows(sheet, f"'{C.REVIEW_TAB}'!A{C.REVIEW_HEADER_ROW}:M", rows)
+    where = g.append_rows(sheet, f"'{C.REVIEW_TAB}'!A{C.REVIEW_HEADER_ROW}:N", rows)
     m = re.search(r"![A-Z]+(\d+):[A-Z]+(\d+)", where or "")
-    if m:   # 👎 box only on the new rows
+    if m:   # ✅ / ☑ / 👎 boxes only on the new rows
         gid = g.sheet_gid(sheet, C.REVIEW_TAB)
         g.batch_update(sheet, [{"setDataValidation": {
             "range": {"sheetId": gid, "startRowIndex": int(m.group(1)) - 1, "endRowIndex": int(m.group(2)),
-                      "startColumnIndex": 7, "endColumnIndex": 8},
+                      "startColumnIndex": 6, "endColumnIndex": 9},
             "rule": {"condition": {"type": "BOOLEAN"}}}}])

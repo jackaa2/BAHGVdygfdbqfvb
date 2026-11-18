@@ -181,7 +181,7 @@ def main():
 
     todo = []
     for i, r in enumerate(rows):
-        if (cell(r, "id") and cell(r, "decision") == "Approve" and cell(r, "status") != "Ready to Post"
+        if (cell(r, "id") and cell(r, "decision") == "Approve" and cell(r, "status") not in DONE
                 and cell(r, "top") and not cell(r, "top").startswith("⚠️ Claude") and cell(r, "send").upper() == "TRUE"):  # only after 🚀 SEND is ticked
             tries = re.findall(r"Edit failed \(try (\d+)\)", cell(r, "notes"))
             if tries and int(tries[-1]) >= 3:

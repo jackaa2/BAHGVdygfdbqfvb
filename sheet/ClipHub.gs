@@ -48,6 +48,31 @@ function cols_(sh) {
   return c;
 }
 
+// Review tab: POST ALL needs ✅ + ☑ on the batch row, and then asks "are you sure?" (simple trigger, so
+// the pop-up can show). Saying No unticks both. Columns: G = ✅ POST, H = ☑ CONFIRM.
+function onEdit(e) {
+  try {
+    const sh = e.range.getSheet();
+    if (sh.getName() !== '🎬 Review' || e.range.getRow() < 4) return;
+    const col = e.range.getColumn();
+    if (col !== 7 && col !== 8) return;
+    const r = e.range.getRow();
+    const row = sh.getRange(r, 1, 1, 14).getValues()[0];
+    if (String(row[0]).indexOf('BATCH ') !== 0) return;          // only the purple batch row
+    if (row[6] !== true || row[7] !== true) return;               // both boxes ticked -> ask
+    const bid = row[13];
+    const all = sh.getRange(4, 1, Math.max(sh.getLastRow() - 3, 1), 14).getValues()
+      .filter(v => v[13] === bid && String(v[0]).indexOf('BATCH ') !== 0 && !/^📅/.test(String(v[10])));
+    const bad = all.filter(v => v[8] === true).length;
+    const ui = SpreadsheetApp.getUi();
+    const ans = ui.alert('Post this whole batch?',
+      'Schedule ' + (all.length - bad) + ' video(s) on YouTube' + (bad ? ' and remake the ' + bad + ' marked 👎' : '') +
+      '?\n\nThey go out within 30 minutes, one every 3 hours per channel.', ui.ButtonSet.YES_NO);
+    if (ans !== ui.Button.YES) sh.getRange(r, 7, 1, 2).setValues([[false, false]]);
+    else sh.getRange(r, 11).setValue('⏳ Approved - booking within 30 min');
+  } catch (err) {}
+}
+
 function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('🎬 Clip Hub')
@@ -335,7 +360,7 @@ function work_() {
   const h1 = c.H1 ? sh.getRange(HEADER_ROWS + 1, c.H1, n, 1).getValues() : top;
   const send = c.SEND ? sh.getRange(HEADER_ROWS + 1, c.SEND, n, 1).getValues() : top.map(() => [false]);
   d.forEach((v, i) => {
-    if (v[0] !== 'Approve' || st[i][0] === 'Ready to Post') return;
+    if (v[0] !== 'Approve' || /^(Ready to Post|Scheduled|Posted)$/.test(st[i][0])) return;
     const t = String(top[i][0]).trim();
     if (realTop_(t) && send[i][0] === true) out.edit = true;
     if (!t && !String(h1[i][0]).trim()) out.hooks = true;

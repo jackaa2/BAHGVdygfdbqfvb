@@ -41,8 +41,10 @@ def parse_et(v):
     return None
 API = "https://api.upload-post.com/api/upload"
 # Review tab columns (0-based)
-R_ID, R_CH, R_NAME, R_HOOK, R_WATCH, R_STREAMER, R_POST, R_BAD, R_ADDED, R_STATUS, R_LIVE, R_FILE, R_BATCH = range(13)
-NCOL = 13
+R_ID, R_CH, R_NAME, R_HOOK, R_WATCH, R_STREAMER, R_POST, R_SURE, R_BAD, R_ADDED, R_STATUS, R_LIVE, R_FILE, R_BATCH \
+    = range(14)
+NCOL = 14
+L = lambda i: chr(65 + i)        # column letter
 WAITING = "👀 In the next batch reel"
 
 
@@ -65,10 +67,12 @@ def panel(g, sheet):
 
 
 def set_panel(g, sheet, head, rows, clip_id, values):
-    """values: {header: value} for the Control Panel row of clip_id"""
+    """values: {header: value} for the Control Panel row of clip_id. Finds the row fresh every time
+    (the grabber re-sorts that sheet, so an older row number could point at a different clip)."""
     ci = head.index("Clip ID")
-    for n, r in enumerate(rows):
-        if len(r) > ci and str(r[ci]).strip() == clip_id:
+    ids = g.get_values(sheet, f"'{C.PANEL_TAB}'!{col_letter(ci)}{C.HEADER_ROWS + 1}:{col_letter(ci)}") or []
+    for n, r in enumerate(ids):
+        if r and str(r[0]).strip() == clip_id:
             for h, v in values.items():
                 if h in head:
                     g.update_values(sheet, f"'{C.PANEL_TAB}'!{col_letter(head.index(h))}{C.HEADER_ROWS + 1 + n}", [[v]])
@@ -124,7 +128,7 @@ def delete_rows(g, sheet, idx):
 
 def read_review(g, sheet):
     return [r + [""] * (NCOL - len(r)) for r in
-            (g.get_values(sheet, f"'{C.REVIEW_TAB}'!A{C.REVIEW_HEADER_ROW + 1}:M", formulas=True) or [])]
+            (g.get_values(sheet, f"'{C.REVIEW_TAB}'!A{C.REVIEW_HEADER_ROW + 1}:N", formulas=True) or [])]
 
 
 def is_header(r):
@@ -211,31 +215,25 @@ def make_batch(g, sheet, review, now):
     watch = (f'=HYPERLINK("https://drive.google.com/file/d/{reel_fid}/view","▶ WATCH REEL")' if reel_fid
              else "reel failed - use the ▶ watch links")
     header = [f"BATCH {bid}", "", f"🎬 {now:%a %b %-d} · {len(loose)} clips for the next 24h", watch, "", "",
-              False, "", now.strftime("%Y-%m-%d %H:%M"),
-              "👀 Watch the reel · 👎 bad ones · tick ✅ on this row to POST ALL", "", reel_fid, bid]
+              False, False, "", now.strftime("%Y-%m-%d %H:%M"),
+              "👀 Watch the reel · 👎 bad ones · tick ✅ + ☑ on this row to POST ALL", "", reel_fid, bid]
     clips = []
     for n, i in enumerate(loose, 1):
         r = list(review[i])
         r[R_NAME] = f"#{n} · Ch{r[R_CH]} · {C.CHANNELS.get(int(r[R_CH]), '')}"
-        r[R_POST], r[R_BAD], r[R_BATCH], r[R_STATUS] = False, ticked(r[R_BAD]), bid, "👀 In the reel above"
+        r[R_POST], r[R_SURE], r[R_BAD], r[R_BATCH], r[R_STATUS] = False, False, ticked(r[R_BAD]), bid, "👀 In the reel above"
         clips.append(r)
     delete_rows(g, sheet, loose)
-    where = g.append_rows(sheet, f"'{C.REVIEW_TAB}'!A{C.REVIEW_HEADER_ROW}:M", [header] + clips)
+    where = g.append_rows(sheet, f"'{C.REVIEW_TAB}'!A{C.REVIEW_HEADER_ROW}:N", [header] + clips)
     m = re.search(r"![A-Z]+(\d+):[A-Z]+(\d+)", where or "")
     if m:
         first, last = int(m.group(1)), int(m.group(2))
         gid = g.sheet_gid(sheet, C.REVIEW_TAB)
-        g.batch_update(sheet, [
-            {"setDataValidation": {"range": {"sheetId": gid, "startRowIndex": first - 1, "endRowIndex": first,
-                                             "startColumnIndex": R_POST, "endColumnIndex": R_POST + 1},
-                                   "rule": {"condition": {"type": "BOOLEAN"}}}},
-            {"setDataValidation": {"range": {"sheetId": gid, "startRowIndex": first, "endRowIndex": last,
-                                             "startColumnIndex": R_BAD, "endColumnIndex": R_BAD + 1},
-                                   "rule": {"condition": {"type": "BOOLEAN"}}}},
-            {"setDataValidation": {"range": {"sheetId": gid, "startRowIndex": first, "endRowIndex": last,
-                                             "startColumnIndex": R_POST, "endColumnIndex": R_POST + 1},
-                                   "rule": {"condition": {"type": "BOOLEAN"}}}},
-        ])
+        box = lambda r0, r1, c0, c1: {"setDataValidation": {
+            "range": {"sheetId": gid, "startRowIndex": r0, "endRowIndex": r1, "startColumnIndex": c0, "endColumnIndex": c1},
+            "rule": {"condition": {"type": "BOOLEAN"}}}}
+        g.batch_update(sheet, [box(first - 1, first, R_POST, R_SURE + 1),       # batch row: ✅ POST ALL + ☑ CONFIRM
+                               box(first, last, R_POST, R_BAD + 1)])            # each clip: ✅ + ☑ + 👎
     print(f"Batch {bid}: {len(loose)} clip(s), reel {'ok' if reel_fid else 'FAILED'}")
     return True
 
@@ -295,14 +293,14 @@ def main():
                 continue
             auto = (C.AUTO_POST_AFTER_HOURS and parse_et(h[R_ADDED]) and
                     now - parse_et(h[R_ADDED]) > dt.timedelta(hours=C.AUTO_POST_AFTER_HOURS))
-            all_ = bool(ticked(h[R_POST]) or auto)
+            all_ = bool((ticked(h[R_POST]) and ticked(h[R_SURE])) or auto)
             bid0 = str(h[R_BATCH]).strip()
             singles = [r for r in review if not is_header(r) and str(r[R_BATCH]).strip() == bid0
-                       and ticked(r[R_POST]) and not str(r[R_STATUS]).startswith("📅")]
+                       and ticked(r[R_POST]) and ticked(r[R_SURE]) and not str(r[R_STATUS]).startswith("📅")]
             if not (all_ or singles):
                 continue
             if not posting:
-                g.update_values(sheet, f"'{C.REVIEW_TAB}'!J{hi + C.REVIEW_HEADER_ROW + 1}",
+                g.update_values(sheet, f"'{C.REVIEW_TAB}'!{L(R_STATUS)}{hi + C.REVIEW_HEADER_ROW + 1}",
                                 [["⚠️ Posting isn't switched on yet"]])
                 continue
             bid = str(h[R_BATCH]).strip()
@@ -311,9 +309,10 @@ def main():
                 if is_header(r) or str(r[R_BATCH]).strip() != bid or str(r[R_STATUS]).startswith("📅"):
                     continue
                 clip_id, a, rn = str(r[R_ID]).strip(), int(r[R_CH]), i + C.REVIEW_HEADER_ROW + 1
-                if not all_ and not ticked(r[R_POST]):
-                    continue          # only the ones you ticked one by one
-                if ticked(r[R_BAD]) and not ticked(r[R_POST]):
+                one = ticked(r[R_POST]) and ticked(r[R_SURE])
+                if not all_ and not one:
+                    continue          # only the ones you ticked (✅ + ☑) one by one
+                if ticked(r[R_BAD]) and not one:
                     redo_clip(g, sheet, head, rows, clip_id, str(r[R_FILE]).strip())
                     drop.append(i); remade += 1
                     continue
@@ -345,7 +344,7 @@ def main():
                     err = str(e)[:100]
                 if resp is None or resp.status_code >= 300:
                     msg = f"⚠️ {err if resp is None else f'Upload-Post said {resp.status_code}: {resp.text[:90]}'}"
-                    g.update_values(sheet, f"'{C.REVIEW_TAB}'!J{rn}", [[msg]])
+                    g.update_values(sheet, f"'{C.REVIEW_TAB}'!{L(R_STATUS)}{rn}", [[msg]])
                     print(f"{clip_id} ch{a}: {msg}"); failed += 1
                     continue
                 try:
@@ -356,7 +355,7 @@ def main():
                 g.append_rows(sheet, f"'{C.POSTS_TAB}'!A:N", [[
                     now.strftime("%Y-%m-%d %H:%M"), a, C.CHANNELS[a], clip_id, r[R_STREAMER], "", hook,
                     slot.strftime("%Y-%m-%d %H:%M"), "", "", "", "", rid, ""]])
-                g.update_values(sheet, f"'{C.REVIEW_TAB}'!J{rn}:K{rn}",
+                g.update_values(sheet, f"'{C.REVIEW_TAB}'!{L(R_STATUS)}{rn}:{L(R_LIVE)}{rn}",
                                 [[f"📅 Scheduled {slot:%a %-I:%M %p}", slot.strftime("%Y-%m-%d %H:%M")]])
                 set_panel(g, sheet, head, rows, clip_id, {"Status": "Scheduled"})
                 booked[a].add(slot)
@@ -364,14 +363,14 @@ def main():
                 done += 1
                 print(f"{clip_id} -> channel {a} at {slot:%a %I:%M %p}")
             note = f"✅ {done} booked" + (f" · {remade} remade" if remade else "") + \
-                   (f" · ⚠️ {failed} failed (tick POST ALL again to retry)" if failed else "") + \
+                   (f" · ⚠️ {failed} failed (tick ✅ + ☑ again to retry)" if failed else "") + \
                    (" · auto-posted" if auto and not ticked(h[R_POST]) else "")
             if failed:
                 note = note.replace("✅", "⏳", 1)
-                g.update_values(sheet, f"'{C.REVIEW_TAB}'!G{hi + C.REVIEW_HEADER_ROW + 1}", [[False]])
+                g.update_values(sheet, f"'{C.REVIEW_TAB}'!{L(R_POST)}{hi + C.REVIEW_HEADER_ROW + 1}:{L(R_SURE)}{hi + C.REVIEW_HEADER_ROW + 1}", [[False, False]])
             if not all_:   # only some clips posted one by one: the batch stays open for the rest
-                note = f"👀 {done} posted one by one · tick ✅ on the rest, or ✅ POST ALL here"
-            g.update_values(sheet, f"'{C.REVIEW_TAB}'!J{hi + C.REVIEW_HEADER_ROW + 1}", [[note]])
+                note = f"👀 {done} posted one by one · ✅ + ☑ the rest, or ✅ + ☑ here to POST ALL"
+            g.update_values(sheet, f"'{C.REVIEW_TAB}'!{L(R_STATUS)}{hi + C.REVIEW_HEADER_ROW + 1}", [[note]])
     delete_rows(g, sheet, drop)
 
     # ---- tidy: once EVERY clip in a batch is booked (or remade), the batch leaves Review right away,
