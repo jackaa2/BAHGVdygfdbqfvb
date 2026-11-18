@@ -132,12 +132,13 @@ def track_credit(g, sheet):
     vals = [str(v[0]).strip() if v else "" for v in vals] + [""] * 5
     money = lambda v: float(str(v).replace("$", "").replace(",", "") or 0)
     try:
-        topped, spent, seen = money(vals[0]), money(vals[1]), vals[4]
+        topped, spent = money(vals[0]), money(vals[1])
+        seen = money(vals[4]) if vals[4] else None
     except ValueError:
         return
-    if vals[0] != seen:          # new balance typed in: start counting again
+    if seen is None or abs(topped - seen) > 0.004:   # new balance typed in: start counting again
         spent = 0.0
-        g.update_values(sheet, f"'{C.ANALYTICS_TAB}'!O8", [[vals[0]]])
+        g.update_values(sheet, f"'{C.ANALYTICS_TAB}'!O8", [[topped]])
     spent += SPENT["usd"]
     g.update_values(sheet, f"'{C.ANALYTICS_TAB}'!O5", [[round(spent, 4)]])
     if CREDIT_OUT["hit"]:
