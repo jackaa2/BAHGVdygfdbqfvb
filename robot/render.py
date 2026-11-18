@@ -53,8 +53,8 @@ def build_ass(words, acct, hook, hook_color, hook_font, handle, spot, duration, 
     border_style = 1
     back = ass_color("#000000", 0x60)
     outline_col = ass_color(st["outline"])
-    hook_size = 104 if len(hook or "") < 28 else 88 if len(hook or "") < 50 else 74
-    hook_y = max(top - 50, 260)
+    hook_size = 92 if len(hook or "") < 26 else 80 if len(hook or "") < 48 else 68
+    hook_y = max(top - 45, 300) if bottom < H - 10 else 380   # static caption: just above the clip
 
     lines = [
         "[Script Info]", "ScriptType: v4.00+", f"PlayResX: {W}", f"PlayResY: {H}",
@@ -98,9 +98,9 @@ def build_ass(words, acct, hook, hook_color, hook_font, handle, spot, duration, 
         lines.append(f"Dialogue: 1,0:00:00.00,{end_all},Mark,,0,0,0,,{{\\an{an}\\pos({x},{y})}}{ass_text(handle)}")
 
     # word-by-word captions: white line + the spoken word in the sunset gradient
-    cap_y = min(st["y"], H - 260)
-    if bottom < H - 10 and not CAPTION_MIDDLE:  # captions under the clip
-        cap_y = max(cap_y, bottom + 120) if bottom + 120 < H - 240 else bottom - 140
+    cap_y = min(st["y"], CREDIT_Y - 90)
+    if bottom < H - 10 and not CAPTION_MIDDLE:  # captions under the clip, above the credit pill
+        cap_y = max(cap_y, bottom + 110) if bottom + 110 < CREDIT_Y - 70 else bottom - 140
     fs, p = st["size"], st["pop"]
     # clean the word list: drop empty words, keep time order, no negative lengths
     clean = []

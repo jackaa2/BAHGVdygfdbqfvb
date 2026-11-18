@@ -156,7 +156,10 @@ def main():
     # --- filter, dedupe, best first ---
     seen, picks = set(), []
     why = {"not GTA 6": 0, "already have": 0, "too few views": 0, "wrong length": 0, "not English": 0}
-    for c in sorted(cands, key=lambda c: c["views"], reverse=True):
+    def rank(c):  # prefer short clips (<= 25 s); longer ones need more views to win
+        return c["views"] * (1.0 if c["seconds"] <= C.PREFERRED_SECONDS else 0.7)
+
+    for c in sorted(cands, key=rank, reverse=True):
         if c.get("tracked") and not is_gta(c, gta):
             why["not GTA 6"] += 1; continue
         if clip_key(c["url"]) in known or clip_key(c["url"]) in seen:

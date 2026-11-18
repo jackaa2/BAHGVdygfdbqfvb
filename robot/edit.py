@@ -26,7 +26,7 @@ if PREVIEWS:
     os.makedirs(PREVIEWS, exist_ok=True)
 NEEDED = {"id": "Clip ID", "decision": "✅ YOUR DECISION", "status": "Status", "raw": "Raw File",
           "edited": "Edited Files", "notes": "Notes", "h1": "Hook 1", "h2": "Hook 2", "h3": "Hook 3",
-          "streamer": "Streamer", "platform": "Platform"}
+          "streamer": "Streamer", "platform": "Platform", "title": "Clip Title"}
 
 
 def col_letter(i):  # 0-based -> A1 letter
@@ -36,6 +36,15 @@ def col_letter(i):  # 0-based -> A1 letter
         i, r = divmod(i - 1, 26)
         s = chr(65 + r) + s
     return s
+
+
+def static_caption(hook, title):
+    """Text shown above the clip: the hook if one was written, otherwise the clip's own title."""
+    t = (hook or "").strip() or (title or "").strip().lstrip("'")
+    t = re.sub(r"\s+", " ", t)
+    if len(re.sub(r"[^A-Za-z]", "", t)) < 3:   # junk titles like "???" or "10k" -> no static caption
+        return ""
+    return t[:70]
 
 
 def best_window(words, dur, length):
@@ -181,7 +190,8 @@ def main():
                 def one(a):
                     st_ = accts[a]
                     out = os.path.join(tmp, f"{clip_id}_A{a}.mp4")
-                    render(src, out, a, words, hooks[HOOK_FOR[a]] if C.SHOW_HOOK else "", st_["hook_color"],
+                    render(src, out, a, words, static_caption(hooks[HOOK_FOR[a]], cell(r, "title"))
+                           if C.SHOW_HOOK else "", "#FFFFFF",
                            hook_font, st_["handle"] if C.SHOW_WATERMARK else "", st_["spot"], st_["zoom"],
                            min(window + st_["trim"], max(dur - 3, 0)), tmp,
                            platform=cell(r, "platform") or "Twitch", streamer=cell(r, "streamer"),

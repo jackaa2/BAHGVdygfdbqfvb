@@ -13,6 +13,7 @@ LOOKBACK_HOURS = 6                      # only clips made in the last N hours
 MIN_VIEWS_CATEGORY = 300               # GTA 6 category clips (any streamer)
 MIN_VIEWS_TRACKED = 100                # clips from streamers on our list
 MIN_SECONDS, MAX_SECONDS = 6, 60
+PREFERRED_SECONDS = 25         # clips up to this length are preferred; longer ones need ~40% more views
 LANGUAGES = {"en"}                      # skip non-English clips
 MAX_NEW_CLIPS_PER_RUN = 15              # keeps Drive + your queue under control
 
@@ -45,7 +46,7 @@ STYLES_TAB = "Account Styles"
 EDIT_MAX_PER_RUN = 25         # approved clips turned into 6 versions per run
 WHISPER_MODEL = "small.en"    # speech-to-text for captions (free, runs on GitHub)
 
-SHOW_HOOK = False             # hook text on top of the video (off: captions only)
+SHOW_HOOK = True              # static caption above the clip (Hook column, or the clip's title if empty)
 SHOW_WATERMARK = False        # turn on once the 6 channel watermarks are in
 
 CLEANUP_ENABLED = True        # Joe approved (Nov 17): delete old robot files for good
@@ -60,4 +61,4 @@ CLEANUP_DAYS = {
 }
 DELETE_RAW_AFTER_EDIT = False # raw is kept 1 day after editing (see CLEANUP_DAYS['approved'])
 STREAMER_ONLY_CAPTIONS = True  # skip game dialogue / donation voices / background chatter
-MAX_CLIP_SECONDS = 25.0       # every version is cut to at most 25 s (the stretch with the most talking)
+MAX_CLIP_SECONDS = 60.0       # hard cap; longer clips are cut to the 60 s with the most talking

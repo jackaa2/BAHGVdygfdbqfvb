@@ -11,14 +11,14 @@ FONT = "Titan One"
 GRADIENT = ["#FFC24A", "#FFA94D", "#FF8A5C", "#FF6B78", "#FF5596", "#E04FB4", "#B84DD6", "#9447F0"]
 
 _base = dict(font=FONT, size=96, upper=True, text="#FFFFFF", outline="#000000", border=7, shadow=3, pop=112)
-CAPTION_MIDDLE = True   # captions sit in the middle of the post (over the lower half of the clip)
+CAPTION_MIDDLE = False  # moving captions sit UNDER the clip (bottom area)
 CAPTION_STYLES = {
-    1: dict(_base, name="3 words",      words=3, y=1060),
-    2: dict(_base, name="2 words",      words=2, y=1020),
-    3: dict(_base, name="3 words",      words=3, y=1100),
-    4: dict(_base, name="2 words",      words=2, y=1080),
-    5: dict(_base, name="1 big word",   words=1, y=1040, size=118),
-    6: dict(_base, name="3 words",      words=3, y=1000),
+    1: dict(_base, name="3 words",      words=3, y=1420),
+    2: dict(_base, name="2 words",      words=2, y=1400),
+    3: dict(_base, name="3 words",      words=3, y=1450),
+    4: dict(_base, name="2 words",      words=2, y=1430),
+    5: dict(_base, name="1 big word",   words=1, y=1410, size=118),
+    6: dict(_base, name="3 words",      words=3, y=1440),
 }
 CREDIT_Y = 1640          # top of the "[logo] streamer" credit pill
 
