@@ -151,11 +151,13 @@ def main():
 
     # each channel's latest booked slot, from the permanent Posts log
     last = {a: None for a in C.CHANNELS}
+    clip_times = {}   # clip -> every time it's already booked (on any channel)
     for p in g.get_values(sheet, f"'{C.POSTS_TAB}'!B2:H") or []:
         try:
             a = int(p[0]); t = dt.datetime.strptime(str(p[6])[:16], "%Y-%m-%d %H:%M").replace(tzinfo=ET)
             if a in last and (last[a] is None or t > last[a]):
                 last[a] = t
+            clip_times.setdefault(str(p[2]).strip(), []).append(t)
         except (ValueError, IndexError):
             pass
     gap, first = dt.timedelta(hours=C.POST_EVERY_HOURS), now + dt.timedelta(minutes=15)
@@ -173,6 +175,14 @@ def main():
                 g.update_values(sheet, f"'{C.REVIEW_TAB}'!J{rn}", [[f"⚠️ No Upload-Post profile set for channel {a}"]])
                 continue
             slot = max(first, last[a] + gap) if last[a] else first
+            # the same clip never goes out on two channels close together (so YouTube doesn't see
+            # copies of each other): keep it SAME_CLIP_GAP_HOURS away from its other bookings
+            spread = dt.timedelta(hours=C.SAME_CLIP_GAP_HOURS)
+            for _ in range(50):
+                clash = [t for t in clip_times.get(clip_id, []) if abs(t - slot) < spread]
+                if not clash:
+                    break
+                slot = max(clash) + spread
             path = g.download(str(r[R_FILE]).strip(), os.path.join(tmp, f"{clip_id}_A{a}.mp4"))
             hook = str(r[R_HOOK]).strip() or f"{r[R_STREAMER]} in GTA 6"
             title = (hook + " #shorts")[:100]
@@ -204,7 +214,8 @@ def main():
             g.update_values(sheet, f"'{C.REVIEW_TAB}'!J{rn}:K{rn}",
                             [[f"📅 Scheduled {slot:%a %-I:%M %p}", slot.strftime("%Y-%m-%d %H:%M")]])
             set_panel(g, sheet, head, rows, clip_id, {"Status": "Scheduled"})
-            last[a] = slot
+            last[a] = max(last[a], slot) if last[a] else slot
+            clip_times.setdefault(clip_id, []).append(slot)
             print(f"{clip_id} -> channel {a} at {slot:%a %I:%M %p}")
     tidy(g, sheet, g.get_values(sheet, f"'{C.REVIEW_TAB}'!A2:L") or [], now)
 

@@ -123,6 +123,7 @@ POST_PRIVACY = "public"       # "public" = goes live at its scheduled time; "unl
 POST_MODE = "split"           # "split": each clip goes to ONE channel (clips take turns)
                               # "all":   each clip goes to ALL 5 channels, each with its own hook
 POST_HASHTAGS = "#GTA6 #GTAVI #GTA #shorts"
+SAME_CLIP_GAP_HOURS = 24      # if a clip goes to more than one channel, its posts are at least this far apart
 
 POSTS_TAB = "📒 Posts"          # permanent log of every Short we booked (+ its YouTube stats)
 ANALYTICS_TAB = "📊 Analytics"  # channel stats, top streamers, top Shorts, 30-day chart
