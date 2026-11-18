@@ -41,9 +41,9 @@ def parse_et(v):
     return None
 API = "https://api.upload-post.com/api/upload"
 # Review tab columns (0-based)
-R_ID, R_CH, R_NAME, R_HOOK, R_WATCH, R_STREAMER, R_POST, R_SURE, R_BAD, R_ADDED, R_STATUS, R_LIVE, R_FILE, R_BATCH \
-    = range(14)
-NCOL = 14
+R_ID, R_CH, R_NAME, R_HOOK, R_WATCH, R_STREAMER, R_POST, R_SURE, R_BAD, R_REDO, R_STATUS, R_LIVE, R_FILE, R_BATCH, \
+    R_ADDED = range(15)
+NCOL = 15
 L = lambda i: chr(65 + i)        # column letter
 WAITING = "👀 In the next batch reel"
 
@@ -147,6 +147,9 @@ def handle_bad(g, sheet, review, now):
                 continue
         if not reason or status.startswith(("📅", "⏳ Remaking", "⏳ Swapping")):
             continue
+        if not ticked(r[R_REDO]) and not status.startswith("⏳"):
+            continue      # picked a reason but hasn't ticked 🔁 REDO yet
+            continue
         swap = reason in C.BAD_SWAP or status == ""
         old_hook = str(r[R_HOOK]).strip()
         try:
@@ -220,7 +223,7 @@ def delete_rows(g, sheet, idx):
 
 def read_review(g, sheet):
     return [r + [""] * (NCOL - len(r)) for r in
-            (g.get_values(sheet, f"'{C.REVIEW_TAB}'!A{C.REVIEW_HEADER_ROW + 1}:N", formulas=True) or [])]
+            (g.get_values(sheet, f"'{C.REVIEW_TAB}'!A{C.REVIEW_HEADER_ROW + 1}:O", formulas=True) or [])]
 
 
 def is_header(r):
@@ -307,16 +310,18 @@ def make_batch(g, sheet, review, now):
     watch = (f'=HYPERLINK("https://drive.google.com/file/d/{reel_fid}/view","▶ WATCH REEL")' if reel_fid
              else "reel failed - use the ▶ watch links")
     header = [f"BATCH {bid}", "", f"🎬 {now:%a %b %-d} · {len(loose)} clips for the next 24h", watch, "", "",
-              False, False, "", now.strftime("%Y-%m-%d %H:%M"),
-              "👀 Watch the reel · 👎 bad ones · tick ✅ + ☑ on this row to POST ALL", "", reel_fid, bid]
+              False, False, "", "",
+              "👀 Watch the reel · 👎 bad ones · tick ✅ + ☑ on this row to POST ALL", "", reel_fid, bid,
+              now.strftime("%Y-%m-%d %H:%M")]
     clips = []
     for n, i in enumerate(loose, 1):
         r = list(review[i])
         r[R_NAME] = f"#{n} · Ch{r[R_CH]} · {C.CHANNELS.get(int(r[R_CH]), '')}"
         r[R_POST], r[R_SURE], r[R_BAD], r[R_BATCH], r[R_STATUS] = False, False, bad_reason(r[R_BAD]), bid, "👀 In the reel above"
+        r[R_REDO] = ticked(r[R_REDO])
         clips.append(r)
     delete_rows(g, sheet, loose)
-    where = g.append_rows(sheet, f"'{C.REVIEW_TAB}'!A{C.REVIEW_HEADER_ROW}:N", [header] + clips)
+    where = g.append_rows(sheet, f"'{C.REVIEW_TAB}'!A{C.REVIEW_HEADER_ROW}:O", [header] + clips)
     m = re.search(r"![A-Z]+(\d+):[A-Z]+(\d+)", where or "")
     if m:
         first, last = int(m.group(1)), int(m.group(2))

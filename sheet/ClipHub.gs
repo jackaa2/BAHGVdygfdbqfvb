@@ -169,10 +169,16 @@ function onDecisionEdit(e) {
       const v = sh.getRange(r, 7, 1, 2).getValues()[0];
       if (v[0] === true && v[1] === true) kick_('post.yml', 'LAST_POST_KICK');
     }
-    // 👎 + a reason: start fixing it now (the new video comes back into this same row)
-    if (r >= 4 && col === 9 && e.value) {
-      sh.getRange(r, 11).setValue('⏳ Got it - fixing (' + e.value + ')…');
-      kick_('post.yml', 'LAST_POST_KICK');
+    // 👎 pick what's wrong, then tick 🔁 REDO to confirm: start fixing it now (new video lands in this same row)
+    if (r >= 5 && col === 10 && e.value === 'TRUE') {
+      const why = sh.getRange(r, 9).getValue();
+      if (!why) {
+        sh.getRange(r, 10).setValue(false);
+        SpreadsheetApp.getActive().toast('Pick what\'s wrong in 👎 first, then tick 🔁 REDO.', '🔁 Redo', 5);
+      } else {
+        sh.getRange(r, 11).setValue('⏳ Got it - fixing (' + why + ')…');
+        kick_('post.yml', 'LAST_POST_KICK');
+      }
     }
     return;
   }
