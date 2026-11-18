@@ -63,10 +63,10 @@ function onEdit(e) {
     const bid = row[13];
     const all = sh.getRange(4, 1, Math.max(sh.getLastRow() - 3, 1), 14).getValues()
       .filter(v => v[13] === bid && String(v[0]).indexOf('BATCH ') !== 0 && !/^📅/.test(String(v[10])));
-    const bad = all.filter(v => v[8] === true).length;
+    const bad = all.filter(v => v[8] !== '' && v[8] !== false && v[0] !== '' && !String(v[0]).startsWith('BATCH')).length;
     const ui = SpreadsheetApp.getUi();
     const ans = ui.alert('Post this whole batch?',
-      'Schedule ' + (all.length - bad) + ' video(s) on YouTube' + (bad ? ' and remake the ' + bad + ' marked 👎' : '') +
+      'Schedule ' + (all.length - bad) + ' video(s) on YouTube' + (bad ? ' (the ' + bad + ' marked 👎 are being fixed and wait for you)' : '') +
       '?\n\nThey go out within 30 minutes, one every 3 hours per channel.', ui.ButtonSet.YES_NO);
     if (ans !== ui.Button.YES) sh.getRange(r, 7, 1, 2).setValues([[false, false]]);
     else sh.getRange(r, 11).setValue('⏳ Approved - booking within 30 min');
@@ -168,6 +168,11 @@ function onDecisionEdit(e) {
     if (r >= 4 && (col === 7 || col === 8)) {
       const v = sh.getRange(r, 7, 1, 2).getValues()[0];
       if (v[0] === true && v[1] === true) kick_('post.yml', 'LAST_POST_KICK');
+    }
+    // 👎 + a reason: start fixing it now (the new video comes back into this same row)
+    if (r >= 4 && col === 9 && e.value) {
+      sh.getRange(r, 11).setValue('⏳ Got it - fixing (' + e.value + ')…');
+      kick_('post.yml', 'LAST_POST_KICK');
     }
     return;
   }

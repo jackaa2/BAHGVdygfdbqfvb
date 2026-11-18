@@ -64,6 +64,13 @@ End one or two of them with ONE emoji (💀 😭 😂 🔥 🫠 🤦); the rest 
 Keep them clean: nothing hateful or sexual.{learned}"""
 
 
+def redo_note(notes):
+    """We 👎'd this clip's hook: steer away from it."""
+    m = re.search(r"\| old: (.+)$", notes or "")
+    return (f"\n\nWe rejected this hook for this clip, write something in a totally different direction: "
+            f"\"{m.group(1).strip()}\"") if m else ""
+
+
 def learned_style(g, sheet):
     """What's worked on OUR channels so far (📒 Posts: hook + views) -> fed back into the prompt so Claude
     leans toward the hook styles that get views. Needs at least 10 posts with views."""

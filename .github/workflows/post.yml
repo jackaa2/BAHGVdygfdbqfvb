@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: read
+  actions: write
 
 concurrency:
   group: post
@@ -35,6 +36,7 @@ jobs:
           fi
           ffmpeg -version | head -1
       - name: Reel, schedule, redo, tidy
+        id: post
         working-directory: robot
         env:
           UPLOAD_POST_KEY: ${{ secrets.UPLOAD_POST_KEY }}
@@ -43,3 +45,8 @@ jobs:
           GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
           SHEET_ID: ${{ secrets.SHEET_ID }}
         run: python -u poster.py
+      - name: Start Claude on 👎 fixes now
+        if: steps.post.outputs.fix == 'yes'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run hooks.yml -R ${{ github.repository }}

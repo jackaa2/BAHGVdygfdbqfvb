@@ -60,6 +60,11 @@ def ticked(v):
     return str(v).strip().upper() == "TRUE"
 
 
+def bad_reason(v):
+    v = str(v).strip()
+    return "" if v.upper() in ("", "FALSE") else ("Hook is bad" if v.upper() == "TRUE" else v)
+
+
 def panel(g, sheet):
     head = [str(h).strip() for h in g.get_values(sheet, f"'{C.PANEL_TAB}'!A{C.HEADER_ROWS}:Z{C.HEADER_ROWS}")[0]]
     rows = g.get_values(sheet, f"'{C.PANEL_TAB}'!A{C.HEADER_ROWS + 1}:Z", formulas=True)
@@ -114,6 +119,90 @@ def redo_clip(g, sheet, head, rows, clip_id, file_id):
         except Exception:
             pass
     print(f"REDO {clip_id}")
+
+
+def handle_bad(g, sheet, review, now):
+    """👎 + a reason -> fix it right away; the new video comes back into the same row (⏳ until then)."""
+    head, rows = panel(g, sheet)
+    hx = {h: i for i, h in enumerate(head)}
+    cell = lambda r, h: str(r[hx[h]]).strip() if h in hx and len(r) > hx[h] else ""
+    by_id = {cell(r, "Clip ID"): r for r in rows}
+    changed = False
+    for i, r in enumerate(review):
+        if is_header(r):
+            continue
+        rn = i + C.REVIEW_HEADER_ROW + 1
+        reason, status = bad_reason(r[R_BAD]), str(r[R_STATUS])
+        clip_id, a = str(r[R_ID]).strip(), int(r[R_CH] or 0)
+        if status.startswith("⏳") and str(r[R_LIVE]).startswith("swap:"):
+            # still waiting: if Claude threw out the remake / the replacement, find another clip
+            pend = str(r[R_LIVE]).replace("swap:", "").strip() or clip_id
+            p = by_id.get(pend)
+            if p is None or cell(p, "✅ YOUR DECISION") == "Reject":
+                reason = reason or "Boring / not funny"
+                status = ""                       # fall through to a (new) swap
+            else:
+                continue
+        if not reason or status.startswith(("📅", "⏳ Remaking", "⏳ Swapping")):
+            continue
+        swap = reason in C.BAD_SWAP or status == ""
+        old_hook = str(r[R_HOOK]).strip()
+        try:
+            g.append_rows(sheet, f"'{C.FEEDBACK_TAB}'!A:F", [[now.strftime("%Y-%m-%d %H:%M"), clip_id, a,
+                                                             str(r[R_STREAMER]), old_hook, reason]])
+        except Exception:
+            pass
+        if str(r[R_FILE]).strip():
+            try:
+                g.trash(str(r[R_FILE]).strip())
+            except Exception:
+                pass
+        if not swap:
+            note = f"🤖 AUTO redo ch{a}: {reason}" + (f" | old: {old_hook}" if reason == "Hook is bad" else "")
+            set_panel(g, sheet, head, rows, clip_id, {
+                "🎯 TOP TEXT": "", "Hook 1": "", "Hook 2": "", "Hook 3": "", "Hook 4": "", "Hook 5": "",
+                "🚀 SEND": False, "Status": "Waiting for Hook", "Edited Files": "", "Notes": note,
+                "✅ YOUR DECISION": "Approve"})
+            msg, pend = f"⏳ Remaking ({reason})…", clip_id
+        else:
+            if clip_id in by_id and cell(by_id[clip_id], "✅ YOUR DECISION") != "Reject":
+                set_panel(g, sheet, head, rows, clip_id, {"✅ YOUR DECISION": "Reject",
+                                                          "Notes": f"🤖 swapped out: {reason}"})
+            cand = replacement(g, sheet, head, rows, cell, now, exclude={clip_id})
+            if not cand:
+                g.update_values(sheet, f"'{C.REVIEW_TAB}'!{L(R_STATUS)}{rn}",
+                                [["⚠️ No new clip to swap in yet - will retry every 30 min"]])
+                continue
+            set_panel(g, sheet, head, rows, cand, {"✅ YOUR DECISION": "Approve", "Status": "Waiting for Hook",
+                                                   "Notes": f"🤖 AUTO swap {clip_id} ch{a}"})
+            by_id.get(cand, [""] * len(head))
+            msg, pend = f"⏳ Swapping in a new clip ({reason})…", cand
+        g.update_values(sheet, f"'{C.REVIEW_TAB}'!{L(R_STATUS)}{rn}:{L(R_LIVE)}{rn}", [[msg, f"swap:{pend}"]])
+        print(f"👎 {clip_id} ch{a}: {reason} -> {'swap for ' + pend if swap else 'remake'}")
+        changed = True
+    if changed and os.environ.get("GITHUB_OUTPUT"):
+        with open(os.environ["GITHUB_OUTPUT"], "a") as f:   # the workflow starts the hook writer right away
+            f.write("fix=yes\n")
+    return changed
+
+
+def replacement(g, sheet, head, rows, cell, now, exclude=()):
+    """Best new clip from the last 24 h nobody has decided on yet (most views first)."""
+    import re as _re
+    nsfw = _re.compile(r"(?i)(🔞|18\+|nud|naked|strip|lap ?dance|boob|flash|goon|horny|gya+t)")
+    best = None
+    for r in rows:
+        cid = cell(r, "Clip ID")
+        if (not cid or cid in exclude or cell(r, "Status") != "New" or cell(r, "✅ YOUR DECISION")
+                or cell(r, "Notes") or nsfw.search(cell(r, "Clip Title"))):
+            continue
+        try:
+            v = float(cell(r, "Views").replace(",", "") or 0)
+        except ValueError:
+            v = 0
+        if best is None or v > best[0]:
+            best = (v, cid)
+    return best[1] if best else None
 
 
 def delete_rows(g, sheet, idx):
@@ -221,7 +310,7 @@ def make_batch(g, sheet, review, now):
     for n, i in enumerate(loose, 1):
         r = list(review[i])
         r[R_NAME] = f"#{n} · Ch{r[R_CH]} · {C.CHANNELS.get(int(r[R_CH]), '')}"
-        r[R_POST], r[R_SURE], r[R_BAD], r[R_BATCH], r[R_STATUS] = False, False, ticked(r[R_BAD]), bid, "👀 In the reel above"
+        r[R_POST], r[R_SURE], r[R_BAD], r[R_BATCH], r[R_STATUS] = False, False, bad_reason(r[R_BAD]), bid, "👀 In the reel above"
         clips.append(r)
     delete_rows(g, sheet, loose)
     where = g.append_rows(sheet, f"'{C.REVIEW_TAB}'!A{C.REVIEW_HEADER_ROW}:N", [header] + clips)
@@ -229,11 +318,12 @@ def make_batch(g, sheet, review, now):
     if m:
         first, last = int(m.group(1)), int(m.group(2))
         gid = g.sheet_gid(sheet, C.REVIEW_TAB)
+        from channels import review_boxes
         box = lambda r0, r1, c0, c1: {"setDataValidation": {
             "range": {"sheetId": gid, "startRowIndex": r0, "endRowIndex": r1, "startColumnIndex": c0, "endColumnIndex": c1},
             "rule": {"condition": {"type": "BOOLEAN"}}}}
-        g.batch_update(sheet, [box(first - 1, first, R_POST, R_SURE + 1),       # batch row: ✅ POST ALL + ☑ CONFIRM
-                               box(first, last, R_POST, R_BAD + 1)])            # each clip: ✅ + ☑ + 👎
+        g.batch_update(sheet, [box(first - 1, first, R_POST, R_SURE + 1)]      # batch row: ✅ POST ALL + ☑ CONFIRM
+                       + review_boxes(gid, first, last))                       # each clip: ✅ + ☑ + 👎 dropdown
     print(f"Batch {bid}: {len(loose)} clip(s), reel {'ok' if reel_fid else 'FAILED'}")
     return True
 
@@ -250,7 +340,7 @@ def main():
         ci = head0.index("Clip ID")
         alive = {str(r[ci]).strip() for r in rows0 if len(r) > ci}
         gone = [i for i, r in enumerate(review) if not is_header(r) and str(r[R_ID]).strip() not in alive
-                and not str(r[R_STATUS]).startswith("📅")]
+                and not str(r[R_STATUS]).startswith(("📅", "⏳"))]
         if gone and alive:
             delete_rows(g, sheet, gone)
             print(f"Review: removed {len(gone)} expired video(s)")
@@ -259,6 +349,12 @@ def main():
         review = read_review(g, sheet)
     if make_batch(g, sheet, review, now):
         review = read_review(g, sheet)
+
+    try:
+        if handle_bad(g, sheet, review, now):
+            review = read_review(g, sheet)
+    except Exception as e:
+        print(f"👎 handling problem: {e}")
 
     key = os.environ.get("UPLOAD_POST_KEY")
     posting = C.POSTING_ENABLED and key
@@ -326,9 +422,8 @@ def main():
                 one = ticked(r[R_POST]) and ticked(r[R_SURE])
                 if not all_ and not one:
                     continue          # only the ones you ticked (✅ + ☑) one by one
-                if ticked(r[R_BAD]) and not one:
-                    redo_clip(g, sheet, head, rows, clip_id, str(r[R_FILE]).strip())
-                    drop.append(i); remade += 1
+                if bad_reason(r[R_BAD]) or str(r[R_STATUS]).startswith("⏳"):
+                    remade += 1       # 👎 / being remade: never posts the old video
                     continue
                 user = C.UPLOAD_POST_USERS.get(a)
                 slot = next_slot(a, first)
@@ -376,12 +471,14 @@ def main():
                 clip_times.setdefault(clip_id, []).append(slot)
                 done += 1
                 print(f"{clip_id} -> channel {a} at {slot:%a %I:%M %p}")
-            note = f"✅ {done} booked" + (f" · {remade} remade" if remade else "") + \
+            note = f"✅ {done} booked" + (f" · {remade} being remade (✅ + ☑ them when ready)" if remade else "") + \
                    (f" · ⚠️ {failed} failed (tick ✅ + ☑ again to retry)" if failed else "") + \
                    (" · auto-posted" if auto and not ticked(h[R_POST]) else "")
             if failed:
                 note = note.replace("✅", "⏳", 1)
                 g.update_values(sheet, f"'{C.REVIEW_TAB}'!{L(R_POST)}{hi + C.REVIEW_HEADER_ROW + 1}:{L(R_SURE)}{hi + C.REVIEW_HEADER_ROW + 1}", [[False, False]])
+            if remade and all_:
+                note = note.replace("✅", "⏳", 1)
             if not all_:   # only some clips posted one by one: the batch stays open for the rest
                 note = f"👀 {done} posted one by one · ✅ + ☑ the rest, or ✅ + ☑ here to POST ALL"
             g.update_values(sheet, f"'{C.REVIEW_TAB}'!{L(R_STATUS)}{hi + C.REVIEW_HEADER_ROW + 1}", [[note]])

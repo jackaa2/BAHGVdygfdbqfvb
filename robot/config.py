@@ -142,3 +142,8 @@ BATCH_MAX_WAIT_MIN = 90         # make the batch anyway if a finished video has 
 AUTO_POST_AFTER_HOURS = None    # e.g. 4: a batch nobody touched posts by itself after 4 h (👎 ones skipped)
 DAILY_BATCH_HOUR = 9             # one review a day: the day's reel is built from 9 AM ET (ready for a 10 AM check);
                                 # None = a new batch whenever a set of clips is finished
+
+# 👎 dropdown on the Review tab: what's wrong -> what the robot does (instantly, the fix lands in the same row)
+BAD_REMAKE = ["Hook is bad", "Captions are off", "Trim / cut is off", "Audio problem", "Looks wrong (watermark/credit)"]
+BAD_SWAP = ["Boring / not funny", "Not GTA 6", "Nudity / NSFW", "Not English", "Duplicate clip"]
+FEEDBACK_TAB = "🗒 Feedback"
