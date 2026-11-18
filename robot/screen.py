@@ -83,7 +83,9 @@ def ask_claude(key, prompt, imgs):
             "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json"},
             json={"model": model, "max_tokens": 400, "messages": [{"role": "user", "content": content}]})
         if r.status_code == 200:
-            text = "".join(b.get("text", "") for b in r.json().get("content", []))
+            body = r.json()
+            text = "".join(b.get("text", "") for b in body.get("content", []))
+            stop = body.get("stop_reason")
             m = re.search(r"\{.*\}", text, re.S)
             if m:
                 try:
@@ -95,7 +97,7 @@ def ask_claude(key, prompt, imgs):
             lines = [l for l in lines if 6 <= len(l) <= 60 and not l.lower().startswith(("here", "hook", "{", "}"))]
             if len(lines) >= 2:
                 return {"hooks": lines[:3]}
-            last = f"{model}: no hooks in reply: {text[:200]!r}"
+            last = f"{model}: no hooks in reply (stop={stop}): {text[:200]!r}"
             continue
         last = f"{model}: {r.status_code} {r.text[:200]}"
         if r.status_code in (401, 403):
@@ -150,7 +152,17 @@ def main():
                 prompt = PROMPT.format(streamer=cell(r, "streamer"), platform=cell(r, "platform"),
                                        title=cell(r, "title").lstrip("'"), views=cell(r, "views"),
                                        seconds=cell(r, "secs"), transcript=transcript(path))
-                res = ask_claude(key, prompt, imgs)
+                try:
+                    res = ask_claude(key, prompt, imgs)
+                except RuntimeError as e:
+                    # usually the transcript (slurs / heavy profanity) makes the model stop early:
+                    # try again with only the frames + title
+                    print(f"{clip_id}: first try failed ({e}); retrying without the transcript")
+                    prompt = PROMPT.format(streamer=cell(r, "streamer"), platform=cell(r, "platform"),
+                                           title=cell(r, "title").lstrip("'"), views=cell(r, "views"),
+                                           seconds=cell(r, "secs"),
+                                           transcript="(left out - go by the frames and title; keep hooks clean)")
+                    res = ask_claude(key, prompt, imgs)
                 hooks = [re.sub(r'["#]', "", str(h)).strip()[:60] for h in (res.get("hooks") or [])][:3]
                 hooks = [h for h in hooks if h]
                 if not hooks:
