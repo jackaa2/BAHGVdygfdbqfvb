@@ -426,7 +426,10 @@ function writeTrimLinks_() {
 }
 
 function trimFormula_(r) {
-  return '=IF($A' + r + '="","",HYPERLINK(' + LINK_CELL + '&"&id="&$A' + r + ',IF($' + colA1_(cols_(SpreadsheetApp.getActive().getSheetByName(PANEL)).CUT) + r + '="","✂️ Trim","✂️ "&$' + colA1_(cols_(SpreadsheetApp.getActive().getSheetByName(PANEL)).CUT) + r + ')))';
+  // reads its own row with ROW(), so it keeps working when the list gets sorted
+  const cut = colA1_(cols_(SpreadsheetApp.getActive().getSheetByName(PANEL)).CUT);
+  const idc = 'INDEX($A:$A,ROW())', cc = 'INDEX($' + cut + ':$' + cut + ',ROW())';
+  return '=IF(' + idc + '="","",HYPERLINK(' + LINK_CELL + '&"&id="&' + idc + ',IF(' + cc + '="","✂️ Trim","✂️ "&' + cc + ')))';
 }
 
 function colA1_(n) { let s = ''; while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); } return s; }

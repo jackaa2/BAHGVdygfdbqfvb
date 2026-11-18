@@ -26,6 +26,14 @@ def col_a1(i):  # 0-based -> A1 letters
     return s
 
 
+def trim_formula(cut):
+    """✂️ Trim link that keeps working when rows are sorted (reads its own row with ROW())."""
+    idc = "INDEX($A:$A,ROW())"
+    cc = f"INDEX(${cut}:${cut},ROW())"
+    return (f'=IF({idc}="","",HYPERLINK(\'Account Styles\'!L1&"&id="&{idc},'
+            f'IF({cc}="","✂️ Trim","✂️ "&{cc})))')
+
+
 def clip_key(url):
     """Same clip, any URL style -> one key (twitch.tv/x/clip/ID, clips.twitch.tv/ID, kick ?clip=ID)."""
     m = re.search(r"(?:/clip/|clips\.twitch\.tv/|[?&]clip=|/clips/)([-\w]+)", url or "")
@@ -276,12 +284,12 @@ def main():
             vals = {"Clip ID": clip_id, "Streamer": safe(c["streamer"]), "Clip Title": safe(c["title"]),
                     "▶ Watch": watch, "Status": "New", "Views": c["views"], "Length (s)": c["seconds"],
                     "Platform": c["platform"], "Grabbed (ET)": now_et.strftime("%Y-%m-%d %H:%M"),
-                    "Raw File": drive_link, "Notes": "🧪 TEST clip (not GTA 6)" if test else ""}
+                    "Raw File": drive_link, "Notes": "🧪 TEST clip (not GTA 6)" if test else "",
+                    "Tier": f"T{min(tier_of.get(norm(c['streamer']), 4), 4)}"}
             row = [vals.get(h, "") for h in header]
             if "✂️ TRIM" in header and "✂️ CUT" in header:  # ✂️ Trim link -> trim page (web app URL in Account Styles!L1)
                 cut = col_a1(hcol("✂️ CUT"))
-                row[hcol("✂️ TRIM")] = (f"=IF($A{{r}}=\"\",\"\",HYPERLINK('Account Styles'!L1&\"&id=\"&$A{{r}},"
-                                       f"IF(${cut}{{r}}=\"\",\"✂️ Trim\",\"✂️ \"&${cut}{{r}})))")
+                row[hcol("✂️ TRIM")] = trim_formula(cut)
             try:
                 ids = g.get_values(sheet, f"'{C.PANEL_TAB}'!A{C.HEADER_ROWS + 1}:A")  # re-check: rows may have moved
                 last = max([i for i, r in enumerate(ids) if r and str(r[0]).strip()], default=-1)
@@ -305,6 +313,21 @@ def main():
                     errors.append(f"{clip_id}: dropdown: {e}")
             except Exception as e:
                 errors.append(f"{clip_id}: saved to Drive but sheet write failed: {e}")
+
+    # --- keep the list sorted: T1 first, then T2, T3, others; most views first inside each tier ---
+    if grabbed and "Tier" in header and "Views" in header:
+        try:
+            ids = g.get_values(sheet, f"'{C.PANEL_TAB}'!A{C.HEADER_ROWS + 1}:A")
+            last = max([i for i, r in enumerate(ids) if r and str(r[0]).strip()], default=-1)
+            if last > 0:
+                gid = g.sheet_gid(sheet, C.PANEL_TAB)
+                g.batch_update(sheet, [{"sortRange": {
+                    "range": {"sheetId": gid, "startRowIndex": C.HEADER_ROWS, "endRowIndex": C.HEADER_ROWS + last + 1,
+                              "startColumnIndex": 0, "endColumnIndex": len(header)},
+                    "sortSpecs": [{"dimensionIndex": hcol("Tier"), "sortOrder": "ASCENDING"},
+                                  {"dimensionIndex": hcol("Views"), "sortOrder": "DESCENDING"}]}}])
+        except Exception as e:
+            errors.append(f"sort: {e}")
 
     # --- Drive clean-up: delete old robot files so the free 15 GB never fills up ---
     try:
