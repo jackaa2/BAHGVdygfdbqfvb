@@ -229,7 +229,7 @@ def main():
                     return a, out
 
                 with ThreadPoolExecutor(max_workers=2) as pool:
-                    for a, out in pool.map(one, range(1, 7)):
+                    for a, out in pool.map(one, sorted(C.CHANNELS)):
                         old = g.find_child(C.ACCOUNT_FOLDERS[a], f"{clip_id}_A{a}.mp4", folder=False)
                         if old:
                             g.trash(old)  # re-edit replaces the older version (old one goes to Drive trash)
@@ -247,13 +247,13 @@ def main():
                     except Exception as e:
                         print(f"preview upload failed: {e}")
                 put(rownum, "edited", '=HYPERLINK("https://drive.google.com/drive/folders/'
-                    f'{C.FOLDERS["ready"][0]}","✅ 6 versions")', clip_id)
+                    f'{C.FOLDERS["ready"][0]}","✅ {made} versions")', clip_id)
                 put(rownum, "status", "Ready to Post", clip_id)
                 try:
                     g.touch(fid)  # raw is kept 1 more day from now, then the clean-up deletes it
                 except Exception as e:
                     print(f"{clip_id}: could not mark raw: {e}")
-                if C.DELETE_RAW_AFTER_EDIT and made == 6:
+                if C.DELETE_RAW_AFTER_EDIT and made == len(C.CHANNELS):
                     try:
                         g.delete(fid)  # all 6 versions are safely in the account folders
                         put(rownum, "raw", "🗑 used (versions made)", clip_id)

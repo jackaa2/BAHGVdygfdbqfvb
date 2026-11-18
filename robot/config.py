@@ -63,3 +63,12 @@ DELETE_RAW_AFTER_EDIT = False # raw is kept 1 day after editing (see CLEANUP_DAY
 STREAMER_ONLY_CAPTIONS = True  # skip game dialogue / donation voices / background chatter
 MAX_CLIP_SECONDS = 60.0       # hard cap; longer clips are cut to the 60 s with the most talking
 TRACKED_BOOST = 1.5           # clips from streamers on the Streamers + Links tab rank higher
+
+# Channels (one per account folder). Account 6 is not used.
+CHANNELS = {
+    1: "Streamers in Leonida | GTA6",
+    2: "Vice City Streamers | GTA 6",
+    3: "GTA 6 Streamer Highlights",
+    4: "GTA 6 TV",
+    5: "Streamers In GTA 6",
+}
