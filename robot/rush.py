@@ -38,16 +38,18 @@ def main():
                 return None
 
     # top up: count this rush's picks that are still alive (Claude may have thrown some out)
-    have = {a: 0 for a in C.CHANNELS}
+    have, per_streamer = {a: 0 for a in C.CHANNELS}, {}
     if os.environ.get("RUSH_TOP_UP") == "yes":
         import re
         for r in rows:
             m = re.match(r"🤖 AUTO rush ch(\d)", cell(r, "Notes"))
             if m and cell(r, "✅ YOUR DECISION") != "Reject":
                 have[int(m.group(1))] = have.get(int(m.group(1)), 0) + 1
+                st = cell(r, "Streamer").lower()
+                per_streamer[st] = per_streamer.get(st, 0) + 1
     need = {a: max(0, per - have[a]) for a in C.CHANNELS}
 
-    cands, per_streamer = [], {}
+    cands = []
     for i, r in enumerate(rows):
         if (not cell(r, "Clip ID") or cell(r, "Status") != "New" or cell(r, "✅ YOUR DECISION")
                 or cell(r, "Notes") or NSFW_TITLE.search(cell(r, "Clip Title"))):
