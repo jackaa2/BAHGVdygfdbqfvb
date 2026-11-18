@@ -60,6 +60,7 @@ function onOpen() {
     .addItem('▶ Run grabber now', 'runGrabberNow')
     .addSeparator()
     .addItem('✂️ Trim selected clip', 'trimSelected')
+    .addItem('📱 Set alert phone numbers (Verizon)…', 'setAlertPhones')
     .addToUi();
 }
 
@@ -291,6 +292,7 @@ function robotTick() {
   const w = work_();
   if (w.hooks) dispatch_('hooks.yml');
   if (w.edit) dispatch_('edit.yml');
+  try { checkAlerts_(); } catch (e) {}
 }
 
 function timerProblem_(code) {
@@ -323,6 +325,50 @@ function resyncAll() {
   const last = sh.getLastRow();
   for (let r = HEADER_ROWS + 1; r <= last; r++) {
     if (sh.getRange(r, c.ID).getValue()) processRow_(sh, r, c);
+  }
+}
+
+// ---- Text alerts (Verizon email-to-text, free). Numbers live only in this script's settings. ----
+function setAlertPhones() {
+  const ui = SpreadsheetApp.getUi();
+  const cur = PropertiesService.getScriptProperties().getProperty('ALERT_PHONES') || '';
+  const r = ui.prompt('Text alerts', 'Verizon numbers to text when the robot needs fixing, comma separated (10 digits each).' +
+    (cur ? '\nNow: ' + cur : ''), ui.ButtonSet.OK_CANCEL);
+  if (r.getSelectedButton() !== ui.Button.OK) return;
+  const nums = r.getResponseText().split(',').map(x => x.replace(/\D/g, '')).filter(x => x.length === 10);
+  if (!nums.length) { ui.alert('No valid 10-digit numbers found.'); return; }
+  PropertiesService.getScriptProperties().setProperty('ALERT_PHONES', nums.join(','));
+  sendAlert_('✅ GTA6 Clip Hub alerts are on. You will get a text here if the robot needs fixing.', true);
+  ui.alert('Saved', 'Sent a test text to ' + nums.join(', ') + '.', ui.ButtonSet.OK);
+}
+
+function sendAlert_(msg, force) {
+  const p = PropertiesService.getScriptProperties();
+  const nums = (p.getProperty('ALERT_PHONES') || '').split(',').filter(Boolean);
+  if (!nums.length) return;
+  const key = 'ALERT_' + msg.slice(0, 40);
+  if (!force && Date.now() - Number(p.getProperty(key) || 0) < 3 * 3600 * 1000) return;  // same alert max every 3 h
+  p.setProperty(key, String(Date.now()));
+  nums.forEach(n => MailApp.sendEmail(n + '@vtext.com', '', msg.slice(0, 150)));
+}
+
+function checkAlerts_() {
+  const sh = SpreadsheetApp.getActive().getSheetByName(PANEL);
+  const status = String(sh.getRange('G1').getValue());
+  if (/FAILED|expired|could not reach/i.test(status)) sendAlert_('🚨 Clip robot: ' + status);
+  else if (/⚠/.test(status) && /DRIVE \d+% FULL/.test(status)) sendAlert_('💾 Clip robot: Drive almost full. ' + status);
+  // robot hasn't run for 2+ hours
+  const m = status.match(/Robot · (\w+) (\d+):(\d+) (AM|PM)/);
+  const last = Number(PropertiesService.getScriptProperties().getProperty('LAST_GRAB') || 0);
+  if (last && Date.now() - last > 2 * 3600 * 1000) sendAlert_('🚨 Clip robot: grabber has not run for 2+ hours. Check the sheet.');
+  // clips stuck after 3 failed edits
+  const c = cols_(sh);
+  if (c.NOTES) {
+    const n = sh.getLastRow() - HEADER_ROWS;
+    if (n > 0) {
+      const bad = sh.getRange(HEADER_ROWS + 1, c.NOTES, n, 1).getValues().filter(v => /Edit failed \(try [3-9]/.test(v[0])).length;
+      if (bad) sendAlert_('⚠ Clip robot: ' + bad + ' clip(s) failed to edit 3 times. See Notes column.');
+    }
   }
 }
 
