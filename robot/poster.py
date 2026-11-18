@@ -364,7 +364,8 @@ def main():
             g.update_values(sheet, f"'{C.REVIEW_TAB}'!J{hi + C.REVIEW_HEADER_ROW + 1}", [[note]])
     delete_rows(g, sheet, drop)
 
-    # ---- tidy: a batch leaves Review a day after its last post went live (📒 Posts keeps everything) ----
+    # ---- tidy: once EVERY clip in a batch is booked (or remade), the batch leaves Review right away,
+    #      ready for the next one (📒 Posts keeps the full record). Anything not posted stays. ----
     review = read_review(g, sheet)
     old = []
     for hi, h in enumerate(review):
@@ -372,17 +373,34 @@ def main():
             continue
         bid = str(h[R_BATCH]).strip()
         mine = [i for i, r in enumerate(review) if not is_header(r) and str(r[R_BATCH]).strip() == bid]
-        lives = [parse_et(review[i][R_LIVE]) for i in mine]
-        if not str(h[R_STATUS]).startswith("✅") and not (mine and all(lives)):
-            continue
-        if all(lives) and (not lives or now - max(lives) > dt.timedelta(days=1)):
+        if all(str(review[i][R_STATUS]).startswith("📅") for i in mine):   # all booked (or none left)
             old += [hi] + mine
             if str(h[R_FILE]).strip():
                 try:
                     g.trash(str(h[R_FILE]).strip())
                 except Exception:
                     pass
+            print(f"Batch {bid}: all posted - cleared from Review")
     delete_rows(g, sheet, old)
+
+    # ---- keep each batch organised: grouped by channel, then by the time it goes live ----
+    review = read_review(g, sheet)
+    gid = g.sheet_gid(sheet, C.REVIEW_TAB)
+    sorts = []
+    for hi, h in enumerate(review):
+        if not is_header(h):
+            continue
+        bid = str(h[R_BATCH]).strip()
+        mine = [i for i, r in enumerate(review) if not is_header(r) and str(r[R_BATCH]).strip() == bid]
+        if len(mine) > 1 and mine == list(range(mine[0], mine[-1] + 1)):
+            sorts.append({"sortRange": {
+                "range": {"sheetId": gid, "startRowIndex": C.REVIEW_HEADER_ROW + mine[0],
+                          "endRowIndex": C.REVIEW_HEADER_ROW + mine[-1] + 1, "startColumnIndex": 0,
+                          "endColumnIndex": NCOL},
+                "sortSpecs": [{"dimensionIndex": R_CH, "sortOrder": "ASCENDING"},
+                              {"dimensionIndex": R_LIVE, "sortOrder": "ASCENDING"}]}})
+    if sorts:
+        g.batch_update(sheet, sorts)
 
 
 if __name__ == "__main__":
