@@ -443,6 +443,7 @@ def main():
     # 🚫 never the same video twice on one channel: by our clip ID and by the original Twitch/Kick clip
     clip_log = g.get_values(sheet, f"'{C.CLIP_LOG_TAB}'!A2:C") or []
     src_of = {str(x[0]).strip(): str(x[1]).strip().lower() for x in clip_log if len(x) > 1 and x[1]}
+    link_of = {str(x[0]).strip(): str(x[2]).strip() for x in clip_log if len(x) > 2 and x[2]}
     on_channel = set()
     for p in g.get_values(sheet, f"'{C.POSTS_TAB}'!B2:D") or []:
         if len(p) > 2:
@@ -537,7 +538,8 @@ def main():
                     body = {}
                 rid = body.get("request_id") or body.get("job_id") or ""
                 g.append_rows(sheet, f"'{C.POSTS_TAB}'!A:N", [[
-                    now.strftime("%Y-%m-%d %H:%M"), a, C.CHANNELS[a], clip_id, r[R_STREAMER], "", hook,
+                    now.strftime("%Y-%m-%d %H:%M"), a, C.CHANNELS[a], clip_id, r[R_STREAMER],
+                    (f'=HYPERLINK("{link_of[clip_id]}","original")' if clip_id in link_of else ""), hook,
                     slot.strftime("%Y-%m-%d %H:%M"), "", "", "", "", rid, ""]])
                 g.update_values(sheet, f"'{C.REVIEW_TAB}'!{L(R_STATUS)}{rn}:{L(R_LIVE)}{rn}",
                                 [[f"📅 Scheduled {slot:%a %-I:%M %p}", slot.strftime("%Y-%m-%d %H:%M")]])
