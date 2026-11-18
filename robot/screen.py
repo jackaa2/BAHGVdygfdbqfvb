@@ -192,8 +192,8 @@ def main():
                     ids = g.get_values(sheet, f"'{C.PANEL_TAB}'!A{C.HEADER_ROWS + 1}:A")
                     hit = [C.HEADER_ROWS + 1 + i for i, x in enumerate(ids) if x and str(x[0]).strip() == clip_id]
                     if hit:
-                        g.update_values(sheet, f"'{C.PANEL_TAB}'!{col_letter(col['h1'])}{hit[0]}",
-                                        [["(Claude skipped this one - type your own TOP TEXT)"]])
+                        g.update_values(sheet, f"'{C.PANEL_TAB}'!{col_letter(col['top'])}{hit[0]}",
+                                        [[C.NO_HOOK_TEXT]])
                 except Exception:
                     pass
     print(f"Wrote hooks for {done} clip(s)")

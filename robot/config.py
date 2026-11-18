@@ -91,3 +91,6 @@ TIKTOK_FOLDERS = {
 }
 # TikTok version N = same video as YouTube version N, only the watermark differs (assets/watermarks/T{N}.png).
 # A TikTok account without a watermark file yet is skipped.
+
+# written in 🎯 TOP TEXT when Claude can't come up with hooks (never used as the video's top text)
+NO_HOOK_TEXT = "⚠️ Claude couldn't write a hook - type your own here"

@@ -165,7 +165,7 @@ function onDecisionEdit(e) {
         continue;
       }
       const approved = String(sh.getRange(r, c.DECISION).getValue()).trim() === 'Approve';
-      const top = c.TOPTEXT ? String(sh.getRange(r, c.TOPTEXT).getValue()).trim() : '';
+      const top = c.TOPTEXT ? realTop_(sh.getRange(r, c.TOPTEXT).getValue()) : '';
       if (!approved) { box.setValue(false); SpreadsheetApp.getActive().toast('Approve the clip first.', '🚀 Not yet', 5); continue; }
       if (!top) { box.setValue(false); SpreadsheetApp.getActive().toast('Pick a hook or type your own in 🎯 TOP TEXT first (or pick "(no top text)").', '🚀 Not yet', 7); continue; }
       const cut = c.CUT ? parseCut_(sh.getRange(r, c.CUT).getDisplayValue()) : null;
@@ -289,7 +289,7 @@ function work_() {
   d.forEach((v, i) => {
     if (v[0] !== 'Approve' || st[i][0] === 'Ready to Post') return;
     const t = String(top[i][0]).trim();
-    if (t && send[i][0] === true) out.edit = true;
+    if (realTop_(t) && send[i][0] === true) out.edit = true;
     if (!t && !String(h1[i][0]).trim()) out.hooks = true;
   });
   return out;
@@ -554,8 +554,14 @@ function refreshStatus_(sh, c, r) {
   const cur = String(st.getValue());
   if (cur === 'Pending' || cur === 'Ready to Post') return;
   if (String(sh.getRange(r, c.DECISION).getValue()).trim() !== 'Approve') return;
-  const top = String(sh.getRange(r, c.TOPTEXT).getValue()).trim();
+  const top = realTop_(sh.getRange(r, c.TOPTEXT).getValue());
   st.setValue(top ? 'Waiting to Send' : 'Waiting for Hook');
+}
+
+// TOP TEXT, ignoring the "Claude couldn't write a hook" note (that note is never used on a video)
+function realTop_(v) {
+  const t = String(v || '').trim();
+  return t.indexOf('⚠️ Claude') === 0 ? '' : t;
 }
 
 function kick_(workflow, key) {
