@@ -15,7 +15,7 @@ MIN_VIEWS_TRACKED = 100                # clips from streamers on our list
 MIN_SECONDS, MAX_SECONDS = 6, 60
 PREFERRED_SECONDS = 25         # clips up to this length are preferred; longer ones need ~40% more views
 LANGUAGES = {"en"}                      # skip non-English clips
-MAX_NEW_CLIPS_PER_RUN = 15              # every 30 min -> ~30 clips an hour
+MAX_NEW_CLIPS_PER_RUN = 25              # every 30 min -> ~50 clips an hour
 
 # Drive folders (fixed IDs, so renaming folders never breaks anything).
 # Names are applied automatically on every run.
