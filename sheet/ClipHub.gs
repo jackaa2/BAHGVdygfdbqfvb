@@ -340,7 +340,8 @@ function processRow_(sh, r, c) {
       const cur = String(status.getValue());
       const later = cur === 'Ready to Post';
       if (!(later && decision === 'Approve')) {
-        const hasTop = c.TOPTEXT && String(sh.getRange(r, c.TOPTEXT).getValue()).trim();
+        const tt = c.TOPTEXT ? String(sh.getRange(r, c.TOPTEXT).getValue()).trim() : '';
+        const hasTop = tt && tt.indexOf('✏️') !== 0;
         status.setValue(decision === 'Approve' && hasTop ? 'Pending' : rule.status);
       }
     }
