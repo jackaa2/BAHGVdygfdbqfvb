@@ -124,11 +124,21 @@ def brand_font(g, workdir):
 _model = None
 
 
-def transcribe(path):
+_big = {}
+
+
+def transcribe(path, better=False):
+    """better=True (👎 'Captions are off'): a bigger, more accurate speech model for this one clip."""
     global _model
     from faster_whisper import WhisperModel
-    if _model is None:
-        _model = WhisperModel(C.WHISPER_MODEL, device="cpu", compute_type="int8")
+    if better:
+        if "m" not in _big:
+            _big["m"] = WhisperModel("medium.en", device="cpu", compute_type="int8")
+        model = _big["m"]
+    else:
+        if _model is None:
+            _model = WhisperModel(C.WHISPER_MODEL, device="cpu", compute_type="int8")
+        model = _model
     # decode with ffmpeg ourselves (avoids PyAV version issues): 16 kHz mono float32
     import numpy as np
     res = subprocess.run(["ffmpeg", "-v", "error", "-i", path, "-vn", "-ac", "1", "-ar", "16000",
@@ -139,7 +149,7 @@ def transcribe(path):
     audio = np.frombuffer(pcm, dtype=np.float32)
     if audio.size < 16000:
         return []
-    segs, _ = _model.transcribe(audio, word_timestamps=True, vad_filter=True, language="en",
+    segs, _ = model.transcribe(audio, word_timestamps=True, vad_filter=True, language="en",
                                 condition_on_previous_text=False)
     seglist = []
     for sg in segs:
@@ -206,7 +216,8 @@ def main():
                     raise RuntimeError("no raw file link")
                 src = g.download(fid, os.path.join(tmp, clip_id + "_raw.mp4"))
                 print(f"   {clip_id} raw: {describe(src)}")
-                words = transcribe(src)
+                fix = cell(r, "notes")
+                words = transcribe(src, better="Captions are off" in fix)
                 from render import probe
                 dur = probe(src)[2]
                 parts = re.split(r"\s*[-–]\s*", cell(r, "cut").lstrip("'")) if cell(r, "cut") else []
@@ -218,6 +229,8 @@ def main():
                     if b0 <= a0 + 0.5:
                         raise RuntimeError(f"✂️ CUT ({cell(r, 'cut')}): end must be after start")
                     window, clip_len = a0, min(b0 - a0, C.MAX_CLIP_SECONDS)
+                elif "Trim / cut is off" in fix:   # 👎 the auto-cut was wrong: use the whole clip instead
+                    window, clip_len = 0.0, min(dur, C.MAX_CLIP_SECONDS)
                 else:
                     window, clip_len = best_window(words, dur, C.MAX_CLIP_SECONDS), C.MAX_CLIP_SECONDS
                 made = 0
@@ -239,7 +252,7 @@ def main():
                     hook_text = per_channel.get(a, cell(r, "top")) if wm_name.startswith("A") else cell(r, "top")
                     render(src, out, a, words, static_caption(hook_text, "") if C.SHOW_HOOK else "", "#FFFFFF",
                            hook_font, st_["handle"] if C.SHOW_WATERMARK else "", st_["spot"], st_["zoom"],
-                           window if manual else min(window + st_["trim"], max(dur - 3, 0)), tmp,
+                           window if (manual or "Trim / cut is off" in fix) else min(window + st_["trim"], max(dur - 3, 0)), tmp,
                            platform=cell(r, "platform") or "Twitch", streamer=cell(r, "streamer"),
                            max_len=clip_len, wm_name=wm_name)
                     if PREVIEWS:

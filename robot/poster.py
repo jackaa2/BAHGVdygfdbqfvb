@@ -472,7 +472,7 @@ def main():
                                 [["⚠️ Posting isn't switched on yet"]])
                 continue
             bid = str(h[R_BATCH]).strip()
-            done = remade = failed = dupes = 0
+            done = remade = failed = dupes = unconfirmed = 0
             for i, r in enumerate(review):
                 if is_header(r) or str(r[R_BATCH]).strip() != bid or str(r[R_STATUS]).startswith(("📅", "🚫")):
                     continue
@@ -480,8 +480,14 @@ def main():
                 one = ticked(r[R_POST]) and ticked(r[R_SURE])
                 if not all_ and not one:
                     continue          # only the ones you ticked (✅ + ☑) one by one
+                if bad_reason(r[R_BAD]) and not ticked(r[R_REDO]) and not str(r[R_STATUS]).startswith("⏳"):
+                    unconfirmed += 1  # 👎 picked but 🔁 not ticked yet: nothing happens to it
+                    continue
                 if bad_reason(r[R_BAD]) or str(r[R_STATUS]).startswith("⏳"):
                     remade += 1       # 👎 / being remade: never posts the old video
+                    continue
+                if not one and str(r[R_STATUS]).startswith("👀 New version"):
+                    remade += 1       # a fixed video needs its own ✅ + ☑ (you haven't seen it yet)
                     continue
                 if (clip_id, str(a)) in on_channel or (src_of.get(clip_id), str(a)) in on_channel:
                     g.update_values(sheet, f"'{C.REVIEW_TAB}'!{L(R_STATUS)}{rn}:{L(R_LIVE)}{rn}",
@@ -556,11 +562,12 @@ def main():
             note = f"✅ {done} booked" + (f" · {remade} being remade (✅ + ☑ them when ready)" if remade else "") + \
                    (f" · ⚠️ {failed} failed (tick ✅ + ☑ again to retry)" if failed else "") + \
                    (f" · 🚫 {dupes} already on that channel" if dupes else "") + \
+                   (f" · 👎 {unconfirmed} waiting for 🔁 REDO tick" if unconfirmed else "") + \
                    (" · auto-posted" if auto and not ticked(h[R_POST]) else "")
             if failed:
                 note = note.replace("✅", "⏳", 1)
                 g.update_values(sheet, f"'{C.REVIEW_TAB}'!{L(R_POST)}{hi + C.REVIEW_HEADER_ROW + 1}:{L(R_SURE)}{hi + C.REVIEW_HEADER_ROW + 1}", [[False, False]])
-            if remade and all_:
+            if (remade or unconfirmed) and all_:
                 note = note.replace("✅", "⏳", 1)
             if not all_:   # only some clips posted one by one: the batch stays open for the rest
                 note = f"👀 {done} posted one by one · ✅ + ☑ the rest, or ✅ + ☑ here to POST ALL"
