@@ -203,7 +203,7 @@ function deleteRejected() {
 }
 
 // ---- Robot timer: kicks the GitHub robots on a schedule (backup for GitHub's own timer) ----
-const GH_REPO = 'jackaa2/gta6-clip-robot';
+const GH_REPO = 'jackaa2/BAHGVdygfdbqfvb';
 
 function connectRobot() {
   const ui = SpreadsheetApp.getUi();
