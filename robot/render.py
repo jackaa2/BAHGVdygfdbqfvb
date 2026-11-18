@@ -246,5 +246,38 @@ def render(src, out, acct, words, hook, hook_color, hook_font, handle, spot, zoo
            "-c:v", "libx264", "-preset", "superfast", "-crf", "23", "-maxrate", "4M", "-bufsize", "8M", "-pix_fmt", "yuv420p", "-r", "30",
            "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-map_metadata", "-1",
            "-movflags", "+faststart", out]
-    subprocess.run(cmd, check=True, capture_output=True, text=True, timeout=900)
+    run_capped(cmd)
     return out
+
+
+MAX_FFMPEG_MB = 2000   # one render never needs more than ~0.5 GB; a runaway is stopped before it can crash the machine
+
+
+def run_capped(cmd, timeout=900):
+    """Run ffmpeg, but kill it if its memory runs away (so one bad clip fails alone instead of
+    taking down the whole GitHub machine and every other clip with it)."""
+    import time
+    with open(os.devnull, "wb") as devnull:
+        p = subprocess.Popen(cmd, stdout=devnull, stderr=subprocess.PIPE)
+    err, start, killed = [], time.time(), None
+    import threading
+    t = threading.Thread(target=lambda: err.append(p.stderr.read()), daemon=True)
+    t.start()
+    while p.poll() is None:
+        try:
+            with open(f"/proc/{p.pid}/status") as f:
+                rss = next((int(l.split()[1]) for l in f if l.startswith("VmRSS:")), 0) // 1024
+        except OSError:
+            rss = 0
+        if rss > MAX_FFMPEG_MB:
+            killed = f"ffmpeg memory ran away ({rss} MB) - this clip's video file is unusual"
+        elif time.time() - start > timeout:
+            killed = f"ffmpeg took over {timeout} s"
+        if killed:
+            p.kill(); p.wait(); break
+        time.sleep(0.5)
+    t.join(5)
+    if killed:
+        raise RuntimeError(killed)
+    if p.returncode != 0:
+        raise subprocess.CalledProcessError(p.returncode, cmd, stderr=(err[0] if err else b"").decode(errors="replace"))
