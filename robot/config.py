@@ -95,3 +95,6 @@ TIKTOK_FOLDERS = {
 # written in 🎯 TOP TEXT when Claude can't come up with hooks (never used as the video's top text)
 NO_HOOK_TEXT = "⚠️ Claude couldn't write a hook - type your own here"
 
+
+# Only grab clips from these tiers on the Streamers + Links tab (T1, T2). Set to None to allow everyone again.
+ONLY_TIERS = {1, 2}
