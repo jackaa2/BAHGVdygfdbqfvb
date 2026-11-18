@@ -280,7 +280,7 @@ def main():
             row = [vals.get(h, "") for h in header]
             if "✂️ TRIM" in header and "✂️ CUT" in header:  # ✂️ Trim link -> trim page (web app URL in Account Styles!L1)
                 cut = col_a1(hcol("✂️ CUT"))
-                row[hcol("✂️ TRIM")] = (f"=IF($A{{r}}=\"\",\"\",HYPERLINK('Account Styles'!L1&\"?id=\"&$A{{r}},"
+                row[hcol("✂️ TRIM")] = (f"=IF($A{{r}}=\"\",\"\",HYPERLINK('Account Styles'!L1&\"&id=\"&$A{{r}},"
                                        f"IF(${cut}{{r}}=\"\",\"✂️ Trim\",\"✂️ \"&${cut}{{r}})))")
             try:
                 ids = g.get_values(sheet, f"'{C.PANEL_TAB}'!A{C.HEADER_ROWS + 1}:A")  # re-check: rows may have moved

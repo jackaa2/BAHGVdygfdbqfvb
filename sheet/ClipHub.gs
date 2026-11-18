@@ -406,7 +406,12 @@ function connectTrimmer() {
   if (r.getSelectedButton() !== ui.Button.OK) return;
   url = r.getResponseText().trim() || url;
   if (!/^https:\/\/script\.google\.com\/.+\/exec$/.test(url)) { ui.alert('That is not a web app URL (it ends with /exec).'); return; }
-  SpreadsheetApp.getActive().getRange(LINK_CELL).setValue(url);
+  // private key in the link instead of a Google sign-in (works with several Google accounts signed in)
+  const p = PropertiesService.getScriptProperties();
+  let key = p.getProperty('TRIM_KEY');
+  if (!key) { key = Utilities.getUuid().replace(/-/g, ''); p.setProperty('TRIM_KEY', key); }
+  SHEET_ID_();
+  SpreadsheetApp.getActive().getRange(LINK_CELL).setValue(url + '?k=' + key);
   writeTrimLinks_();
   ui.alert('Trimmer connected', 'Every clip row now has a ✂️ Trim link.', ui.ButtonSet.OK);
 }
@@ -421,14 +426,14 @@ function writeTrimLinks_() {
 }
 
 function trimFormula_(r) {
-  return '=IF($A' + r + '="","",HYPERLINK(' + LINK_CELL + '&"?id="&$A' + r + ',IF($' + colA1_(cols_(SpreadsheetApp.getActive().getSheetByName(PANEL)).CUT) + r + '="","✂️ Trim","✂️ "&$' + colA1_(cols_(SpreadsheetApp.getActive().getSheetByName(PANEL)).CUT) + r + ')))';
+  return '=IF($A' + r + '="","",HYPERLINK(' + LINK_CELL + '&"&id="&$A' + r + ',IF($' + colA1_(cols_(SpreadsheetApp.getActive().getSheetByName(PANEL)).CUT) + r + '="","✂️ Trim","✂️ "&$' + colA1_(cols_(SpreadsheetApp.getActive().getSheetByName(PANEL)).CUT) + r + ')))';
 }
 
 function colA1_(n) { let s = ''; while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); } return s; }
 
 function doGet(e) {
-  const me = (Session.getActiveUser().getEmail() || '').toLowerCase();
-  if (TEAM.map(x => x.toLowerCase()).indexOf(me) < 0) return HtmlService.createHtmlOutput('Not allowed for ' + (me || 'this account'));
+  const key = PropertiesService.getScriptProperties().getProperty('TRIM_KEY');
+  if (!key || !e || !e.parameter || e.parameter.k !== key) return HtmlService.createHtmlOutput('Link expired: open it from the sheet.');
   const id = String((e && e.parameter && e.parameter.id) || '');
   const sh = SpreadsheetApp.openById(SHEET_ID_()).getSheetByName(PANEL);
   const c = cols_(sh);
@@ -440,7 +445,7 @@ function doGet(e) {
   const len = Number(c.LENGTH ? sh.getRange(r, c.LENGTH).getValue() : 0) || 60;
   const cut = c.CUT ? parseCut_(sh.getRange(r, c.CUT).getDisplayValue()) : null;
   const t = HtmlService.createTemplate(TRIM_HTML);
-  t.id = id; t.fileId = fileId; t.len = Math.min(len, 600);
+  t.id = id; t.fileId = fileId; t.len = Math.min(len, 600); t.k = e.parameter.k;
   t.a = cut && cut !== -1 ? cut[0] : 0;
   t.b = cut && cut !== -1 ? cut[1] : Math.min(len, 60);
   return t.evaluate().setTitle('✂️ Trim ' + id).addMetaTag('viewport', 'width=device-width, initial-scale=1');
@@ -453,7 +458,8 @@ function SHEET_ID_() {
   return id;
 }
 
-function saveTrim(id, a, b) {
+function saveTrim(id, a, b, k) {
+  if (k !== PropertiesService.getScriptProperties().getProperty('TRIM_KEY')) throw new Error('not allowed');
   const sh = SpreadsheetApp.openById(SHEET_ID_()).getSheetByName(PANEL);
   const c = cols_(sh);
   const ids = sh.getRange(HEADER_ROWS + 1, c.ID, Math.max(sh.getLastRow() - HEADER_ROWS, 1), 1).getValues();
@@ -517,7 +523,7 @@ const TRIM_HTML = `
  A.oninput=upd;B.oninput=upd;upd();
  document.getElementById('save').onclick=function(){this.textContent='Saving…';
   google.script.run.withSuccessHandler(t=>{this.textContent='✅ Saved: '+t;this.textContent='✅ Saved: '+t+' (you can close this tab)'})
-   .saveTrim('<?= id ?>',+A.value,+B.value);};
+   .saveTrim('<?= id ?>',+A.value,+B.value,'<?= k ?>');};
 </script>`;
 
 // '0:05' / '5' / '1:02' -> seconds; '' -> null; junk -> -1
