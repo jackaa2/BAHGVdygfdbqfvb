@@ -54,7 +54,7 @@ CLEANUP_ENABLED = True        # Joe approved (Nov 17): delete old robot files fo
 CLEANUP_DAYS = {
     "rejected": 1,      # videos in "6 - Rejected" (the 🗑 button removes them right away)
     "new": 3,           # never-decided clips in "1 - New Clips"
-    "hold": 3,          # "2 - On Hold"
+    "hold": 7,          # "2 - On Hold" (a week)
     "approved": 3,      # leftover raws in "3 - Approved" (normally deleted right after editing)
     "ready": 3,         # finished versions in "4 - Ready to Post/Account N"
 }
