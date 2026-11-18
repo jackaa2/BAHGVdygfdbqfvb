@@ -72,7 +72,7 @@ class Google:
     def append_rows(self, sheet_id, rng, rows):
         """Returns the A1 range the rows landed in (e.g. "'Tab'!A12:L16")."""
         r = self._req("POST", f"{SHEETS}/{sheet_id}/values/{requests.utils.quote(rng)}:append",
-                      params={"valueInputOption": "USER_ENTERED", "insertDataOption": "INSERT_ROWS"},
+                      params={"valueInputOption": "USER_ENTERED", "insertDataOption": "OVERWRITE"},
                       json={"values": rows})
         try:
             return r.json().get("updates", {}).get("updatedRange", "")
