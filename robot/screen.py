@@ -1,5 +1,6 @@
-"""Claude screener: for every new clip without a score, Claude watches 4 frames + reads what's said,
-then writes Claude Score (1-10), Claude Verdict (Recommend/Maybe/Reject) and Hook 1-3 (the top text)."""
+"""Claude hook writer: for every new clip without hooks, Claude looks at 4 frames + reads what's said and
+writes 3 hooks (Hook 1-3). The 🎯 TOP TEXT cell gets a dropdown of those 3 (+ "(no top text)");
+you pick one before you can approve."""
 import base64
 import json
 import os
@@ -31,15 +32,12 @@ Clip info:
 The images are 4 frames from the clip, in order.
 
 Reply with ONLY this JSON, nothing else:
-{{"score": <1-10, how well this would do as a Short>,
-  "verdict": "Recommend" | "Maybe" | "Reject",
-  "hooks": ["<hook 1>", "<hook 2>", "<hook 3>"]}}
+{{"hooks": ["<hook 1>", "<hook 2>", "<hook 3>"]}}
 
 Hook rules: 3 different on-screen top lines for the post, each max 45 characters, punchy, curiosity or
 reaction style (e.g. "Kai was NOT ready for this", "Speed broke the game in 5 seconds"), use the streamer's
 name when it helps, no emojis, no hashtags, no quotes, nothing false about what happens in the clip.
-Score low / Reject if: boring, nothing happens, unclear without context, not GTA related (unless it's
-still a great streamer moment), or anything hateful/sexual/unsafe."""
+Make the 3 hooks different angles (reaction, curiosity, bold claim). Keep them clean: nothing hateful or sexual."""
 
 
 def frames(path, tmp, n=4):
@@ -108,8 +106,8 @@ def main():
     sheet = os.environ["SHEET_ID"]
     g = Google()
     head = g.get_values(sheet, f"'{C.PANEL_TAB}'!A{C.HEADER_ROWS}:Z{C.HEADER_ROWS}")[0]
-    need = {"id": "Clip ID", "streamer": "Streamer", "title": "Clip Title", "score": "Claude Score",
-            "verdict": "Claude Verdict", "decision": "✅ YOUR DECISION", "views": "Views",
+    need = {"id": "Clip ID", "streamer": "Streamer", "title": "Clip Title", "top": "🎯 TOP TEXT",
+            "views": "Views",
             "secs": "Length (s)", "platform": "Platform", "raw": "Raw File",
             "h1": "Hook 1", "h2": "Hook 2", "h3": "Hook 3"}
     col = {k: head.index(v) for k, v in need.items() if v in head}
@@ -121,7 +119,8 @@ def main():
     def cell(r, k):
         return str(r[col[k]]).strip() if len(r) > col[k] else ""
 
-    todo = [r for r in rows if cell(r, "id") and not cell(r, "score")][:MAX_PER_RUN]
+    todo = [r for r in rows if cell(r, "id") and not (cell(r, "h1") or cell(r, "h2") or cell(r, "h3"))][:MAX_PER_RUN]
+    gid = g.sheet_gid(sheet, C.PANEL_TAB)
     print(f"{len(todo)} clip(s) to screen")
     done = 0
     with tempfile.TemporaryDirectory() as tmp:
@@ -137,29 +136,32 @@ def main():
                                        title=cell(r, "title").lstrip("'"), views=cell(r, "views"),
                                        seconds=cell(r, "secs"), transcript=transcript(path))
                 res = ask_claude(key, prompt, imgs)
-                score = max(1, min(10, int(round(float(res.get("score", 5))))))
-                verdict = res.get("verdict") if res.get("verdict") in ("Recommend", "Maybe", "Reject") else "Maybe"
                 hooks = [re.sub(r'["#]', "", str(h)).strip()[:60] for h in (res.get("hooks") or [])][:3]
-                hooks += [""] * (3 - len(hooks))
+                hooks = [h for h in hooks if h]
+                if not hooks:
+                    raise RuntimeError("Claude returned no hooks")
                 # find the row again right before writing (rows can move)
                 ids = g.get_values(sheet, f"'{C.PANEL_TAB}'!A{C.HEADER_ROWS + 1}:A")
                 hit = [C.HEADER_ROWS + 1 + i for i, x in enumerate(ids) if x and str(x[0]).strip() == clip_id]
                 if not hit:
                     continue
                 rn = hit[0]
-                g.update_values(sheet, f"'{C.PANEL_TAB}'!{col_letter(col['score'])}{rn}:"
-                                       f"{col_letter(col['verdict'])}{rn}", [[score, verdict]])
-                # don't overwrite hooks someone already typed
-                if not (cell(r, "h1") or cell(r, "h2") or cell(r, "h3")):
-                    g.update_values(sheet, f"'{C.PANEL_TAB}'!{col_letter(col['h1'])}{rn}:"
-                                           f"{col_letter(col['h3'])}{rn}", [hooks])
-                print(f"{clip_id}: {score}/10 {verdict} | {hooks[0]}")
+                g.update_values(sheet, f"'{C.PANEL_TAB}'!{col_letter(col['h1'])}{rn}:"
+                                       f"{col_letter(col['h3'])}{rn}", [hooks + [""] * (3 - len(hooks))])
+                # dropdown in 🎯 TOP TEXT with these hooks (typing your own text is allowed too)
+                g.batch_update(sheet, [{"setDataValidation": {
+                    "range": {"sheetId": gid, "startRowIndex": rn - 1, "endRowIndex": rn,
+                              "startColumnIndex": col["top"], "endColumnIndex": col["top"] + 1},
+                    "rule": {"condition": {"type": "ONE_OF_LIST", "values": [
+                        {"userEnteredValue": h} for h in hooks + ["(no top text)"]]},
+                        "showCustomUi": True, "strict": False}}}])
+                print(f"{clip_id}: {hooks}")
                 done += 1
                 os.remove(path)
             except Exception as e:
                 traceback.print_exc()
                 print(f"{clip_id}: screening failed: {e}")
-    print(f"Screened {done} clip(s)")
+    print(f"Wrote hooks for {done} clip(s)")
 
 
 if __name__ == "__main__":

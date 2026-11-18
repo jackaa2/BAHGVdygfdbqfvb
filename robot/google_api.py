@@ -61,6 +61,13 @@ class Google:
         self._req("PUT", f"{SHEETS}/{sheet_id}/values/{requests.utils.quote(rng)}",
                   params={"valueInputOption": "USER_ENTERED"}, json={"values": values})
 
+    def batch_update(self, sheet_id, requests_):
+        self._req("POST", f"{SHEETS}/{sheet_id}:batchUpdate", json={"requests": requests_})
+
+    def sheet_gid(self, sheet_id, title):
+        meta = self._req("GET", f"{SHEETS}/{sheet_id}", params={"fields": "sheets(properties(sheetId,title))"}).json()
+        return next(x["properties"]["sheetId"] for x in meta["sheets"] if x["properties"]["title"] == title)
+
     def append_rows(self, sheet_id, rng, rows):
         self._req("POST", f"{SHEETS}/{sheet_id}/values/{requests.utils.quote(rng)}:append",
                   params={"valueInputOption": "USER_ENTERED", "insertDataOption": "INSERT_ROWS"},

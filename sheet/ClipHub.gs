@@ -20,7 +20,7 @@ const PANEL = 'Control Panel';
 const STYLES = 'Account Styles';
 const HEADER_ROWS = 3;
 // Columns are found by their header text in row 3, so moving columns never breaks this.
-const HEAD = { ID: 'Clip ID', RAWFILE: 'Raw File', DECISION: '✅ YOUR DECISION', DECIDED_BY: 'Decided By', STATUS: 'Status', NOTES: 'Notes' };
+const HEAD = { TOPTEXT: '🎯 TOP TEXT', ID: 'Clip ID', RAWFILE: 'Raw File', DECISION: '✅ YOUR DECISION', DECIDED_BY: 'Decided By', STATUS: 'Status', NOTES: 'Notes' };
 // Internal keys (stored at setup) -> folder names shown in Drive.
 const NAMES = {
   '00_Brand': '0 - Brand Kit (logos + watermarks)',
@@ -298,6 +298,11 @@ function processRow_(sh, r, c) {
   const ids = JSON.parse(PropertiesService.getDocumentProperties().getProperty('FOLDERS') || '{}');
   if (!ids.ROOT || !c.DECISION || !c.RAWFILE) return;
   const decision = String(sh.getRange(r, c.DECISION).getValue()).trim();
+  if (decision === 'Approve' && c.TOPTEXT && !String(sh.getRange(r, c.TOPTEXT).getValue()).trim()) {
+    sh.getRange(r, c.DECISION).setValue('');   // must pick a hook first
+    SpreadsheetApp.getActive().toast('Pick a hook in 🎯 TOP TEXT first, then Approve.', '🎯 Hook needed', 6);
+    return;
+  }
   const rule = MOVE[decision];
   if (!rule) return;
   const fileId = extractId_(sh.getRange(r, c.RAWFILE));

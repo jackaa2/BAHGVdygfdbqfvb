@@ -5,6 +5,7 @@ import re
 import subprocess
 
 from credit import make_credit
+from hookcard import make_hook
 from styles import CAPTION_MIDDLE, CAPTION_STYLES, CREDIT_Y, GRADIENT, PICTURE
 
 W, H = 1080, 1920
@@ -77,9 +78,7 @@ def build_ass(words, acct, hook, hook_color, hook_font, handle, spot, duration, 
     end_all = fmt_t(duration + 1)
 
     # hook (whole clip), bottom-aligned just above the video
-    if hook:
-        lines.append(f"Dialogue: 2,0:00:00.00,{end_all},Hook,,0,0,0,,{{\\pos({W // 2},{hook_y})}}"
-                     f"{{\\fad(150,0)}}{ass_text(hook)}")
+    # (hook is drawn as a TikTok-style white box image in render(), not here)
 
     # watermark (whole clip), inside the video area
     if handle:
@@ -188,10 +187,17 @@ def render(src, out, acct, words, hook, hook_color, hook_font, handle, spot, zoo
     ass_path = os.path.join(workdir, f"a{acct}.ass")
     with open(ass_path, "w", encoding="utf-8") as f:
         f.write(build_ass(shifted, acct, hook, hook_color, hook_font, handle, spot, length, (top, bottom)))
-    credit_png = os.path.join(workdir, f"credit_{acct}.png")
-    has_credit = bool(streamer)
-    if has_credit:
-        cw, _ = make_credit(platform, streamer, credit_png)
+    extra_inputs, overlays = [], []
+    if streamer:
+        credit_png = os.path.join(workdir, f"credit_{acct}.png")
+        make_credit(platform, streamer, credit_png)
+        extra_inputs.append(credit_png); overlays.append(("(W-w)/2", str(CREDIT_Y)))
+    if hook:
+        hook_png = os.path.join(workdir, f"hook_{acct}.png")
+        size = make_hook(hook, hook_png)
+        if size:
+            hy = max(top - size[1] - 36, 140) if bottom < H - 10 else 300
+            extra_inputs.append(hook_png); overlays.append(("(W-w)/2", str(hy)))
 
     vf = (
         f"[0:v]split=2[a][b];"
@@ -201,11 +207,15 @@ def render(src, out, acct, words, hook, hook_color, hook_font, handle, spot, zoo
            if fg_h >= H else f"[b]scale={fg_w}:{fg_h},crop=min({W}\\,iw):ih,")
         + f"eq=saturation={pic['sat']}:brightness={pic['bright']}[fg];"
         f"[bg][fg]overlay=(W-w)/2:{max(top, 0)},setsar=1,"
-        f"ass={ass_path}:fontsdir={FONTS_DIR}" + ("[pre];[pre][1:v]overlay=(W-w)/2:" + str(CREDIT_Y) + "[v]"
-                                                  if has_credit else "[v]")
+        f"ass={ass_path}:fontsdir={FONTS_DIR}[s0]"
     )
+    last = "s0"
+    for i, (ox, oy) in enumerate(overlays):
+        vf += f";[{last}][{i + 1}:v]overlay={ox}:{oy}[s{i + 1}]"
+        last = f"s{i + 1}"
+    vf += f";[{last}]null[v]"
     cmd = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-ss", f"{trim:.2f}", "-t", f"{length:.2f}",
-           "-i", src] + (["-loop", "1", "-i", credit_png] if has_credit else []) + [
+           "-i", src] + sum([["-loop", "1", "-i", x] for x in extra_inputs], []) + [
            "-filter_complex", vf, "-t", f"{length:.2f}", "-map", "[v]", "-map", "0:a?",
            "-c:v", "libx264", "-preset", "superfast", "-crf", "23", "-maxrate", "4M", "-bufsize", "8M", "-pix_fmt", "yuv420p", "-r", "30",
            "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-map_metadata", "-1",
