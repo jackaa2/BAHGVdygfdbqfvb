@@ -239,7 +239,7 @@ def main():
                                         "-vf", "scale=360:640", os.path.join(PREVIEWS, name.replace(".mp4", ".jpg"))])
                     return folder, name, out
 
-                with ThreadPoolExecutor(max_workers=2) as pool:
+                with ThreadPoolExecutor(max_workers=min(4, os.cpu_count() or 2)) as pool:
                     for folder, name, out in pool.map(one, jobs):
                         old = g.find_child(folder, name, folder=False)
                         if old:
