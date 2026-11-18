@@ -426,6 +426,14 @@ function checkAlerts_() {
   const status = String(sh.getRange('G1').getValue());
   if (/FAILED|expired|could not reach/i.test(status)) sendAlert_('🚨 Clip robot: ' + status);
   else if (/⚠/.test(status) && /DRIVE \d+% FULL/.test(status)) sendAlert_('💾 Clip robot: Drive almost full. ' + status);
+  // Claude credit running low (estimate on the Analytics tab)
+  try {
+    const an = SpreadsheetApp.getActive().getSheetByName('📊 Analytics');
+    const left = an.getRange('O6').getValue(), floor = Number(an.getRange('O7').getValue()) || 2;
+    if (left !== '' && !isNaN(left) && Number(left) < floor)
+      sendAlert_('💳 Clip robot: Claude credit is down to about $' + Number(left).toFixed(2) +
+                 '. Top up at console.anthropic.com, then type the new balance on the Analytics tab (O4).');
+  } catch (e) {}
   // robot hasn't run for 2+ hours
   const m = status.match(/Robot · (\w+) (\d+):(\d+) (AM|PM)/);
   const last = Number(PropertiesService.getScriptProperties().getProperty('LAST_GRAB') || 0);
