@@ -40,7 +40,7 @@ def col_letter(i):  # 0-based -> A1 letter
 
 def static_caption(hook, title):
     """Text shown above the clip: the hook if one was written, otherwise the clip's own title."""
-    t = (hook or "").strip() or (title or "").strip().lstrip("'")
+    t = (hook or "").strip()   # only a written hook (by you or Claude); never the raw Twitch title
     t = re.sub(r"\s+", " ", t)
     if len(re.sub(r"[^A-Za-z]", "", t)) < 3:   # junk titles like "???" or "10k" -> no static caption
         return ""
