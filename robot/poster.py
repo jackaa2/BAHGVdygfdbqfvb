@@ -273,7 +273,8 @@ def backfill(g, sheet, review):
     add = []
     for r in rows:
         cid = cell(r, "Clip ID")
-        if not cid or cell(r, "Status") != "Ready to Post" or cid in on_review or cid in booked:
+        if (not cid or cell(r, "Status") != "Ready to Post" or cid in on_review or cid in booked
+                or cell(r, "✅ YOUR DECISION") == "Reject"):        # 👎 swapped-out clips never come back
             continue
         hooks = channel_hooks(cell(r, "🎯 TOP TEXT"), [cell(r, f"Hook {k}") for k in range(1, 6)])
         chans = sorted(C.CHANNELS) if C.POST_MODE == "all" else \
@@ -408,6 +409,13 @@ def main():
         except (ValueError, IndexError, KeyError):
             pass
     first = now + dt.timedelta(minutes=15)
+    try:   # 🧠 hours where our Shorts flop get skipped
+        from learn import quiet_hours
+        quiet = quiet_hours(g, sheet)
+        if quiet:
+            print(f"Learned quiet hours (skipped): {sorted(quiet)}")
+    except Exception as e:
+        print(f"learn: {e}"); quiet = set()
 
     def next_slot(a, after):
         """One post every POST_EVERY_HOURS per channel, channels staggered, and each slot nudged by a
@@ -429,7 +437,7 @@ def main():
                 if all(abs(t - o) >= dt.timedelta(minutes=C.SLOT_MIN_APART_MIN) for o in everyone):
                     break
                 t += dt.timedelta(minutes=C.SLOT_MIN_APART_MIN)
-            if t >= after:
+            if t >= after and t.hour not in quiet:
                 return t
 
     # 🚫 never the same video twice on one channel: by our clip ID and by the original Twitch/Kick clip

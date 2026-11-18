@@ -163,3 +163,7 @@ SUBSCRIPTIONS = [("Upload-Post Basic", 24.00, 18)]
 # 🧾 every clip the robot ever grabbed (never cleaned up): ID, source clip, and which channels it went out on.
 # The grabber never takes the same source clip twice; the poster never puts one on the same channel twice.
 CLIP_LOG_TAB = "🧾 Clip log"
+
+# 🧠 learning from results (📒 Posts views): starts once this many Shorts have been live 2+ days
+LEARN_MIN_POSTS = 20
+MAX_QUIET_HOURS = 6     # at most this many hours a day get skipped for flopping

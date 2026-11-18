@@ -107,9 +107,15 @@ def auto_pick(g, sheet, now_et):
     tag = f"{AUTO_TAG} {start:%m/%d %-I%p}"
     head = [str(h).strip() for h in g.get_values(sheet, f"'{C.PANEL_TAB}'!A{C.HEADER_ROWS}:Z{C.HEADER_ROWS}")[0]]
     need = {"id": "Clip ID", "dec": "✅ YOUR DECISION", "notes": "Notes", "views": "Views",
-            "grabbed": "Grabbed (ET)", "status": "Status", "top": "🎯 TOP TEXT"}
+            "grabbed": "Grabbed (ET)", "status": "Status", "top": "🎯 TOP TEXT",
+            "streamer": "Streamer", "title": "Clip Title"}
     if any(v not in head for v in need.values()):
         return 0
+    try:   # 🧠 streamers whose Shorts do better get picked more
+        from learn import streamer_boost
+        boost = streamer_boost(g, sheet)
+    except Exception as e:
+        print(f"learn: {e}"); boost = {}
     ci = {k: head.index(v) for k, v in need.items()}
     rows = g.get_values(sheet, f"'{C.PANEL_TAB}'!A{C.HEADER_ROWS + 1}:Z", formulas=True)
     cell = lambda r, k: str(r[ci[k]]).strip() if len(r) > ci[k] else ""
@@ -138,9 +144,11 @@ def auto_pick(g, sheet, now_et):
     for i, r in enumerate(rows):
         if not cell(r, "id") or cell(r, "dec") or cell(r, "notes") or cell(r, "top") or cell(r, "status") != "New":
             continue
+        if NSFW_TITLE.search(cell(r, "title")):
+            continue
         t = grabbed_at(cell(r, "grabbed"))
         if t and t >= since:
-            cands.append((views(r), i))
+            cands.append((views(r) * boost.get(cell(r, "streamer").lower(), 1.0), i))
     picks = [i for _, i in sorted(cands, reverse=True)[:want]]
     for i in picks:
         rn = C.HEADER_ROWS + 1 + i
