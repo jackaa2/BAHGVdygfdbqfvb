@@ -81,7 +81,7 @@ def ask_claude(key, prompt, imgs):
     for model in MODELS:
         r = requests.post(API, timeout=120, headers={
             "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json"},
-            json={"model": model, "max_tokens": 400, "messages": [{"role": "user", "content": content}]})
+            json={"model": model, "max_tokens": 2000, "messages": [{"role": "user", "content": content}]})
         if r.status_code == 200:
             body = r.json()
             text = "".join(b.get("text", "") for b in body.get("content", []))
