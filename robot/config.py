@@ -54,7 +54,7 @@ CLEANUP_ENABLED = True        # Joe approved (Nov 17): delete old robot files fo
 # approved clip makes ~6 x 20 MB, so old files are deleted for good after these many days.
 CLEANUP_DAYS = {
     "rejected": 1,      # videos in "6 - Rejected" (the 🗑 button removes them right away)
-    "new": 7,           # never-decided clips in "1 - New Clips"
+    "new": 3,           # never-decided clips in "1 - New Clips"
     "hold": 7,          # "2 - On Hold" (no longer used; leftovers cleared after a week)
     "approved": 1,      # raw clips in "3 - Approved": kept 1 day after their 6 versions were made
     "ready": 7,         # finished versions in "4 - Ready to Post/Account N"
