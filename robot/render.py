@@ -108,15 +108,7 @@ def build_ass(words, acct, hook, hook_color, hook_font, handle, spot, duration, 
                 t = ass_text(x["word"].strip())
                 if st["upper"]:
                     t = t.upper()
-                if k == wi:
-                    col = st["active"]
-                    if st.get("alternate"):
-                        col = st["active"] if ci % 2 else st["text"]
-                    p = st["pop"]
-                    parts.append(f"{{\\c{ass_color(col)}\\fscx{p}\\fscy{p}\\t(0,90,\\fscx100\\fscy100)}}{t}"
-                                 f"{{\\c{ass_color(st['text'])}\\fscx100\\fscy100}}")
-                else:
-                    parts.append(t)
+                parts.append(t)  # no per-word highlight: whole line in the channel's text color
             glow = ""
             if st.get("glow"):
                 glow_line = (f"Dialogue: 0,{fmt_t(start)},{fmt_t(end)},Cap,,0,0,0,,"
