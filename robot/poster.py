@@ -316,7 +316,9 @@ def make_batch(g, sheet, review, now):
     if C.DAILY_BATCH_HOUR is not None:
         # one shift a day: everything made since yesterday goes into ONE reel, built before your review time
         made_today = any(is_header(r) and str(r[R_BATCH]).startswith(now.strftime("%m%d-")) for r in review)
-        rush = os.environ.get("FORCE_BATCH") == "yes" and not being_made(head, rows)
+        # you ticked ✅ + ☑ on a clip that isn't in a reel yet -> make the batch now so it can post
+        rush = os.environ.get("FORCE_BATCH") == "yes" or any(
+            ticked(review[i][R_POST]) and ticked(review[i][R_SURE]) for i in loose)
         if (now.hour < C.DAILY_BATCH_HOUR or made_today) and not rush:
             print(f"Batch: {len(loose)} video(s) waiting for the daily reel ({C.DAILY_BATCH_HOUR}:00 ET)")
             return False
@@ -350,7 +352,10 @@ def make_batch(g, sheet, review, now):
     for n, i in enumerate(loose, 1):
         r = list(review[i])
         r[R_NAME] = f"#{n} · Ch{r[R_CH]} · {C.CHANNELS.get(int(r[R_CH]), '')}"
-        r[R_POST], r[R_SURE], r[R_BAD], r[R_BATCH], r[R_STATUS] = False, False, bad_reason(r[R_BAD]), bid, "👀 In the reel above"
+        # keep any ticks you already put on it (✅ + ☑ on a loose clip posts it right after this)
+        r[R_POST], r[R_SURE], r[R_BAD], r[R_BATCH] = ticked(r[R_POST]), ticked(r[R_SURE]), bad_reason(r[R_BAD]), bid
+        if not str(r[R_STATUS]).startswith(("⏳", "👀 New")):
+            r[R_STATUS] = "👀 In the reel above"
         r[R_REDO] = ticked(r[R_REDO])
         clips.append(r)
     delete_rows(g, sheet, loose)
