@@ -101,7 +101,19 @@ def build_ass(words, acct, hook, hook_color, hook_font, handle, spot, duration, 
     if bottom < H - 10:  # clip sits in the middle: captions under it
         cap_y = max(cap_y, bottom + 120) if bottom + 120 < H - 240 else bottom - 140
     fs, p = st["size"], st["pop"]
-    for chunk in chunk_words(words, st["words"]):
+    # clean the word list: drop empty words, keep time order, no negative lengths
+    clean = []
+    for w in sorted(words, key=lambda w: w["start"]):
+        t = ass_text(w["word"]).strip()
+        if not t or not re.search(r"\w", t):
+            continue
+        st_ = max(w["start"], clean[-1]["start"] + 0.01) if clean else max(w["start"], 0)
+        clean.append({"word": t, "start": st_, "end": max(w["end"], st_ + 0.05)})
+    chunks = chunk_words(clean, st["words"])
+    # every caption event ends before the next one starts -> never two lines on screen at once
+    starts = [w["start"] for c in chunks for w in c] + [duration + 5]
+    nxt = {id(w): starts[i + 1] for i, w in enumerate(w for c in chunks for w in c)}
+    for chunk in chunks:
         texts = [ass_text(x["word"].strip()) for x in chunk]
         texts = [t.upper() if st["upper"] else t for t in texts]
         # keep the line on one row: shrink if it would be wider than the screen
@@ -112,6 +124,9 @@ def build_ass(words, acct, hook, hook_color, hook_font, handle, spot, duration, 
         for wi, w in enumerate(chunk):
             start = w["start"]
             end = chunk[wi + 1]["start"] if wi + 1 < len(chunk) else max(w["end"], start + 0.25)
+            end = min(end, nxt[id(w)] - 0.01, duration)
+            if end <= start:
+                continue
             t0, t1 = fmt_t(start), fmt_t(end)
 
             def line(show_all=True):

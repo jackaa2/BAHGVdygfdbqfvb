@@ -59,3 +59,4 @@ CLEANUP_DAYS = {
     "ready": 3,         # finished versions in "4 - Ready to Post/Account N"
 }
 DELETE_RAW_AFTER_EDIT = True  # approved raw clip is deleted once all 6 versions are in the account folders
+STREAMER_ONLY_CAPTIONS = True  # skip game dialogue / donation voices / background chatter

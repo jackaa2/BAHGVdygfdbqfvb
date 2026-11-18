@@ -17,6 +17,7 @@ from zoneinfo import ZoneInfo
 import config as C
 from google_api import Google
 from render import FONTS_DIR, render
+from speaker import keep_streamer
 from styles import HOOK_COLORS, HOOK_FOR
 
 ET = ZoneInfo("America/New_York")
@@ -91,14 +92,18 @@ def transcribe(path):
     audio = np.frombuffer(pcm, dtype=np.float32)
     if audio.size < 16000:
         return []
-    segs, _ = _model.transcribe(audio, word_timestamps=True, vad_filter=True, language="en")
-    words = []
-    for s in segs:
-        for w in (s.words or []):
-            t = w.word.strip()
-            if t:
-                words.append({"word": t, "start": float(w.start), "end": float(w.end)})
-    return words
+    segs, _ = _model.transcribe(audio, word_timestamps=True, vad_filter=True, language="en",
+                                condition_on_previous_text=False)
+    seglist = []
+    for sg in segs:
+        ws = [{"word": w.word.strip(), "start": float(w.start), "end": float(w.end)}
+              for w in (sg.words or []) if w.word.strip()]
+        if ws:
+            seglist.append({"start": float(sg.start), "end": float(sg.end), "text": sg.text.strip(), "words": ws,
+                            "no_speech_prob": float(sg.no_speech_prob), "avg_logprob": float(sg.avg_logprob)})
+    if C.STREAMER_ONLY_CAPTIONS:
+        seglist = keep_streamer(audio, seglist)
+    return [w for sg in seglist for w in sg["words"]]
 
 
 def main():
