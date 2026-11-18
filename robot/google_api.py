@@ -136,11 +136,22 @@ class Google:
     def trash(self, file_id):
         self._req("PATCH", f"{DRIVE}/files/{file_id}", json={"trashed": True})
 
+    def delete(self, file_id):
+        """Permanent delete (frees Drive space right away)."""
+        self._req("DELETE", f"{DRIVE}/files/{file_id}")
+
     def list_children(self, parent_id):
-        r = self._req("GET", f"{DRIVE}/files", params={
-            "q": f"'{parent_id}' in parents and trashed = false", "fields": "files(id,name,mimeType)",
-            "pageSize": 200})
-        return r.json().get("files", [])
+        out, token = [], None
+        while True:
+            params = {"q": f"'{parent_id}' in parents and trashed = false",
+                      "fields": "nextPageToken,files(id,name,mimeType,createdTime,modifiedTime)", "pageSize": 1000}
+            if token:
+                params["pageToken"] = token
+            j = self._req("GET", f"{DRIVE}/files", params=params).json()
+            out += j.get("files", [])
+            token = j.get("nextPageToken")
+            if not token:
+                return out
 
     def upload(self, path, name, parent_id, mime="video/mp4"):
         """Resumable upload (works for big files)."""

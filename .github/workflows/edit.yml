@@ -12,7 +12,7 @@ concurrency:
 jobs:
   edit:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 150
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -34,4 +34,13 @@ jobs:
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
           GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
           SHEET_ID: ${{ secrets.SHEET_ID }}
+          PREVIEW_DIR: ${{ github.workspace }}/previews
         run: python edit.py
+      - name: Save preview frames (for checking the look)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: previews
+          path: previews/
+          retention-days: 3
+          if-no-files-found: ignore

@@ -98,7 +98,8 @@ def build_ass(words, acct, hook, hook_color, hook_font, handle, spot, duration, 
 
     # word-by-word captions: white line + the spoken word in the sunset gradient
     cap_y = min(st["y"], H - 260)
-    cap_y = max(cap_y, bottom + 120) if bottom + 120 < H - 240 else bottom - 140
+    if bottom < H - 10:  # clip sits in the middle: captions under it
+        cap_y = max(cap_y, bottom + 120) if bottom + 120 < H - 240 else bottom - 140
     fs, p = st["size"], st["pop"]
     for chunk in chunk_words(words, st["words"]):
         texts = [ass_text(x["word"].strip()) for x in chunk]
@@ -150,6 +151,8 @@ def probe(path):
 
 
 def video_box(src_w, src_h, zoom, y_shift):
+    if src_w / src_h < 1.2:   # vertical or square clip: fill the whole screen
+        return W, H, 0, H
     fg_w = int(round(W * zoom / 2) * 2)
     fg_h = int(round(fg_w * src_h / src_w / 2) * 2)
     fg_h = min(fg_h, H)
@@ -171,13 +174,15 @@ def render(src, out, acct, words, hook, hook_color, hook_font, handle, spot, zoo
         f"[0:v]split=2[a][b];"
         f"[a]scale=270:480:force_original_aspect_ratio=increase,crop=270:480,boxblur=12:2,"
         f"scale={W}:{H},eq=brightness={pic['blur_dim']}:saturation=1.2[bg];"
-        f"[b]scale={fg_w}:{fg_h},crop=min({W}\\,iw):ih,eq=saturation={pic['sat']}:brightness={pic['bright']}[fg];"
-        f"[bg][fg]overlay=(W-w)/2:{top},setsar=1,"
+        + (f"[b]scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H},"
+           if fg_h >= H else f"[b]scale={fg_w}:{fg_h},crop=min({W}\\,iw):ih,")
+        + f"eq=saturation={pic['sat']}:brightness={pic['bright']}[fg];"
+        f"[bg][fg]overlay=(W-w)/2:{max(top, 0)},setsar=1,"
         f"ass={ass_path}:fontsdir={FONTS_DIR}[v]"
     )
     cmd = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-ss", f"{trim:.2f}", "-i", src,
            "-filter_complex", vf, "-map", "[v]", "-map", "0:a?",
-           "-c:v", "libx264", "-preset", "veryfast", "-crf", "21", "-pix_fmt", "yuv420p", "-r", "30",
+           "-c:v", "libx264", "-preset", "superfast", "-crf", "23", "-maxrate", "6M", "-bufsize", "12M", "-pix_fmt", "yuv420p", "-r", "30",
            "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-map_metadata", "-1",
            "-movflags", "+faststart", out]
     subprocess.run(cmd, check=True, capture_output=True, text=True, timeout=900)

@@ -42,8 +42,19 @@ ACCOUNT_FOLDERS = {
     6: "1luy_PwOSYeAVpoGURHyBormFrMb8CK5S",
 }
 STYLES_TAB = "Account Styles"
-EDIT_MAX_PER_RUN = 6          # approved clips turned into 6 versions per run
+EDIT_MAX_PER_RUN = 25         # approved clips turned into 6 versions per run
 WHISPER_MODEL = "small.en"    # speech-to-text for captions (free, runs on GitHub)
 
 SHOW_HOOK = False             # hook text on top of the video (off: captions only)
 SHOW_WATERMARK = False        # turn on once the 6 channel watermarks are in
+
+CLEANUP_ENABLED = False       # OFF until Joe approves automatic deletion
+# Drive clean-up (robot-made files only, inside the clip folders). Free Drive is 15 GB and each
+# approved clip makes ~6 x 20 MB, so old files are deleted for good after these many days.
+CLEANUP_DAYS = {
+    "rejected": 7,      # videos in "6 - Rejected"
+    "new": 7,           # never-decided clips in "1 - New Clips"
+    "ready": 14,        # finished versions in "4 - Ready to Post/Account N"
+    "approved": 14,     # raw files in "3 - Approved"
+    "hold": 30,         # "2 - On Hold"
+}

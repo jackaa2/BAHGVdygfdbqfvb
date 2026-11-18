@@ -36,6 +36,36 @@ def safe(text):
     return "'" + text if text[:1] in "=+-@" else text
 
 
+def cleanup(g, now_et):
+    now = dt.datetime.now(dt.timezone.utc)
+
+    def age_days(f):
+        t = max(f.get("createdTime", ""), f.get("modifiedTime", ""))
+        return (now - dt.datetime.fromisoformat(t.replace("Z", "+00:00"))).total_seconds() / 86400 if t else 0
+
+    def sweep(folder_id, days, recurse=False):
+        n = 0
+        for f in g.list_children(folder_id):
+            if f["mimeType"] == "application/vnd.google-apps.folder":
+                if recurse:
+                    n += sweep(f["id"], days, recurse)
+                    if not g.list_children(f["id"]) and age_days(f) > 1:
+                        g.delete(f["id"])  # empty date folder
+                continue
+            if f["name"].lower().endswith(".mp4") and age_days(f) > days:
+                g.delete(f["id"]); n += 1
+        return n
+
+    d = C.CLEANUP_DAYS
+    n = sweep(C.FOLDERS["rejected"][0], d["rejected"])
+    n += sweep(C.FOLDERS["new"][0], d["new"], recurse=True)
+    n += sweep(C.FOLDERS["approved"][0], d["approved"])
+    n += sweep(C.FOLDERS["hold"][0], d["hold"])
+    for fid in C.ACCOUNT_FOLDERS.values():
+        n += sweep(fid, d["ready"])
+    return n
+
+
 def main():
     sheet = os.environ.get("SHEET_ID") or C.SHEET_ID_FALLBACK
     g = Google()
@@ -167,10 +197,21 @@ def main():
                     c["views"], c["seconds"], c["platform"], now_et.strftime("%Y-%m-%d %H:%M"),
                     drive_link, ""] + [""] * 3 + (["🧪 TEST clip (not GTA 6)"] if test else [""]))
             try:
+                ids = g.get_values(sheet, f"'{C.PANEL_TAB}'!A{C.HEADER_ROWS + 1}:A")  # re-check: rows may have moved
+                last = max([i for i, r in enumerate(ids) if r and str(r[0]).strip()], default=-1)
+                next_row = C.HEADER_ROWS + 1 + last + 1
                 g.update_values(sheet, f"'{C.PANEL_TAB}'!A{next_row}", [row])
-                next_row += 1; grabbed += 1
+                grabbed += 1
             except Exception as e:
                 errors.append(f"{clip_id}: saved to Drive but sheet write failed: {e}")
+
+    # --- Drive clean-up: delete old robot files so the free 15 GB never fills up ---
+    try:
+        removed = cleanup(g, now_et) if C.CLEANUP_ENABLED else 0
+        if removed:
+            print(f"Clean-up: deleted {removed} old file(s)")
+    except Exception as e:
+        errors.append(f"clean-up: {e}")
 
     # --- Drive space check ---
     try:

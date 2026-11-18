@@ -238,12 +238,37 @@ function hasEditWork_() {
 
 function robotTick() {
   const p = PropertiesService.getScriptProperties();
+  // once a day: make sure GitHub hasn't switched the robots off (it does that after 60 quiet days)
+  const day = new Date().toDateString();
+  if (p.getProperty('LAST_KEEPALIVE') !== day) {
+    ['grab.yml', 'edit.yml'].forEach(wf => ghCall_('put', '/actions/workflows/' + wf + '/enable'));
+    p.setProperty('LAST_KEEPALIVE', day);
+  }
   const last = Number(p.getProperty('LAST_GRAB') || 0);
   if (Date.now() - last >= 29 * 60 * 1000) {
-    dispatch_('grab.yml');
-    p.setProperty('LAST_GRAB', String(Date.now()));
+    const code = dispatch_('grab.yml');
+    if (code === 204) p.setProperty('LAST_GRAB', String(Date.now()));
+    else timerProblem_(code);
   }
   if (hasEditWork_()) dispatch_('edit.yml');
+}
+
+function timerProblem_(code) {
+  const msg = (code === 401 || code === 403 || code === 404)
+    ? '⚠ Robot timer key expired or wrong. Fix: 🎬 Clip Hub > Connect robot timer (make a new GitHub key).'
+    : '⚠ Robot timer could not reach GitHub (code ' + code + '). Will retry in 10 min.';
+  try { SpreadsheetApp.getActive().getSheetByName(PANEL).getRange('G1').setValue(msg); } catch (e) {}
+}
+
+function ghCall_(method, path) {
+  const token = PropertiesService.getScriptProperties().getProperty('GH_TOKEN');
+  if (!token) return 0;
+  try {
+    return UrlFetchApp.fetch('https://api.github.com/repos/' + GH_REPO + path, {
+      method: method, muteHttpExceptions: true,
+      headers: { Authorization: 'Bearer ' + token, Accept: 'application/vnd.github+json' },
+    }).getResponseCode();
+  } catch (e) { return -1; }
 }
 
 function runGrabberNow() {
