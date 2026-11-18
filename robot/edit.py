@@ -233,7 +233,7 @@ def main():
                            hook_font, st_["handle"] if C.SHOW_WATERMARK else "", st_["spot"], st_["zoom"],
                            window if manual else min(window + st_["trim"], max(dur - 3, 0)), tmp,
                            platform=cell(r, "platform") or "Twitch", streamer=cell(r, "streamer"),
-                           max_len=clip_len, wm_name=wm_name, bell=C.BELL_SFX)
+                           max_len=clip_len, wm_name=wm_name)
                     if PREVIEWS:
                         subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", "3", "-i", out, "-frames:v", "1",
                                         "-vf", "scale=360:640", os.path.join(PREVIEWS, name.replace(".mp4", ".jpg"))])
@@ -281,7 +281,7 @@ def main():
 
 
 def make_sample(g, sheet, rows, cell, clip_id):
-    """TEST: one YouTube channel-1 version of a clip, with the bell, saved as a GitHub artifact.
+    """TEST: one YouTube channel-1 version of a clip, saved as a GitHub artifact.
     Touches nothing in the sheet or the channel folders."""
     r = next((r for r in rows if cell(r, "id") == clip_id), None)
     if not r:
@@ -298,10 +298,10 @@ def make_sample(g, sheet, rows, cell, clip_id):
             top = cell(r, "h1") or "Sample hook 🔔"
         hook_font = brand_font(g, tmp)
         st_ = account_settings(g, sheet)[1]
-        out = os.path.join(out_dir, f"SAMPLE_{clip_id}_bell.mp4")
+        out = os.path.join(out_dir, f"SAMPLE_{clip_id}.mp4")
         render(src, out, 1, words, static_caption(top, ""), "#FFFFFF", hook_font, "", st_["spot"], st_["zoom"],
                best_window(words, dur, C.MAX_CLIP_SECONDS), tmp, platform=cell(r, "platform") or "Twitch",
-               streamer=cell(r, "streamer"), max_len=C.MAX_CLIP_SECONDS, wm_name="A1", bell=True)
+               streamer=cell(r, "streamer"), max_len=C.MAX_CLIP_SECONDS, wm_name="A1")
         pv = g.ensure_folder(C.ROOT_FOLDER[0], "_previews (test)")
         old = g.find_child(pv, os.path.basename(out), folder=False)
         if old:

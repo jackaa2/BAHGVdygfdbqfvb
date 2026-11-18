@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       sample_id:
-        description: "TEST: make one sample video (with the bell) of this clip ID; changes nothing else"
+        description: "TEST: make one sample video of this clip ID; changes nothing else"
         required: false
         default: ""
       preview:
