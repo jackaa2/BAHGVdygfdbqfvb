@@ -131,6 +131,9 @@ def main():
         g.rename(*C.ROOT_FOLDER)
         for fid, name in C.FOLDERS.values():
             g.rename(fid, name)
+        tk = g.ensure_folder(C.ROOT_FOLDER[0], C.TIKTOK_ROOT_NAME)  # TikTok: its own Ready to Post folder
+        for a, name in C.TIKTOK_CHANNELS.items():
+            g.ensure_folder(tk, f"{a} - {name}")
         for a, fid in C.ACCOUNT_FOLDERS.items():  # channel folders inside "4 - Ready to Post"
             g.rename(fid, f"{a} - {C.CHANNELS[a]}".replace("|", "-") if a in C.CHANNELS else f"{a} - (not used)")
         for dup in C.DUPLICATE_ROOTS:

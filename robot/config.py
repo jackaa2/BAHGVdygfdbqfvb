@@ -72,3 +72,13 @@ CHANNELS = {
     4: "GTA 6 TV",
     5: "Streamers In GTA 6",
 }
+
+# TikTok accounts: own "Ready to Post (TikTok)" folder, one sub-folder each (watermarks to come: assets/watermarks/T1..T5.png)
+TIKTOK_ROOT_NAME = "4 - Ready to Post (TikTok)"
+TIKTOK_CHANNELS = {
+    1: "gta6.streamer.highlights",
+    2: "gta6streamertv",
+    3: "gta6vcreels",
+    4: "gta6streamerworld",
+    5: "gta6streamerhq",
+}
