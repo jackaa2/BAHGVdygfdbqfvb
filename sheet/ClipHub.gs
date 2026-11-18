@@ -77,17 +77,19 @@ function onOpen() {
   try { SpreadsheetApp.getActive().getSheetByName('🎬 Review').activate(); } catch (e) {}
   SpreadsheetApp.getUi()
     .createMenu('🎬 Clip Hub')
-    .addItem('1. First-time setup (folders + links + auto-move)', 'setup')
-    .addItem('Re-check all decisions now', 'resyncAll')
-    .addSeparator()
-    .addItem('🗑 Delete all rejected clips…', 'deleteRejected')
-    .addSeparator()
-    .addItem('⏱ Connect robot timer (GitHub key)…', 'connectRobot')
     .addItem('▶ Run grabber now', 'runGrabberNow')
+    .addItem('📅 Post what I approved now (instead of waiting up to 30 min)', 'runPosterNow')
     .addSeparator()
-    .addItem('✂️ Connect trimmer (after deploying web app)…', 'connectTrimmer')
     .addItem('📱 Set alert phone numbers (Verizon)…', 'setAlertPhones')
+    .addItem('⏱ Connect robot timer (GitHub key)…', 'connectRobot')
+    .addItem('✂️ Connect trimmer (after deploying web app)…', 'connectTrimmer')
     .addToUi();
+}
+
+function runPosterNow() {
+  const code = dispatch_('post.yml');
+  SpreadsheetApp.getUi().alert(code === 204 ? 'Posting started. Times show in the Status column in 1-3 minutes.'
+    : 'Could not start it (connect the robot timer first).');
 }
 
 function setup() {
@@ -158,6 +160,17 @@ function writeLinks_(ids) {
 function onDecisionEdit(e) {
   if (!e || !e.range) return;
   const sh = e.range.getSheet();
+  // Review tab: as soon as a clip (or a batch) has BOTH ✅ and ☑ ticked, start posting right away
+  // instead of waiting for the next 30-min run. (If you answer No to the POST ALL pop-up, the boxes
+  // are unticked before the robot reads them, so nothing posts.)
+  if (sh.getName() === '🎬 Review') {
+    const col = e.range.getColumn(), r = e.range.getRow();
+    if (r >= 4 && (col === 7 || col === 8)) {
+      const v = sh.getRange(r, 7, 1, 2).getValues()[0];
+      if (v[0] === true && v[1] === true) kick_('post.yml', 'LAST_POST_KICK');
+    }
+    return;
+  }
   if (sh.getName() !== PANEL) return;
   if (e.range.getA1Notation() === DELETE_BOX) {
     if (e.range.getValue() === true) {
@@ -374,7 +387,7 @@ function robotTick() {
   // once a day: make sure GitHub hasn't switched the robots off (it does that after 60 quiet days)
   const day = new Date().toDateString();
   if (p.getProperty('LAST_KEEPALIVE') !== day) {
-    ['grab.yml', 'edit.yml'].forEach(wf => ghCall_('put', '/actions/workflows/' + wf + '/enable'));
+    ['grab.yml', 'edit.yml', 'hooks.yml', 'post.yml'].forEach(wf => ghCall_('put', '/actions/workflows/' + wf + '/enable'));
     p.setProperty('LAST_KEEPALIVE', day);
   }
   const last = Number(p.getProperty('LAST_GRAB') || 0);
