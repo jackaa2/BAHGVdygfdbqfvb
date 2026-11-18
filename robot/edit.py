@@ -215,25 +215,32 @@ def main():
                 hooks = {1: cell(r, "h1"), 2: cell(r, "h2"), 3: cell(r, "h3")}
                 made = 0
 
-                def one(a):
+                # YouTube A1-A5 + TikTok T1-T5 (TikTok N = YouTube N, only the watermark differs)
+                from render import WM_DIR
+                jobs = [(a, f"A{a}", C.ACCOUNT_FOLDERS[a], f"{clip_id}_A{a}.mp4") for a in sorted(C.CHANNELS)]
+                jobs += [(t, f"T{t}", C.TIKTOK_FOLDERS[t], f"{clip_id}_TT{t}.mp4") for t in sorted(C.TIKTOK_FOLDERS)
+                         if os.path.exists(os.path.join(WM_DIR, f"T{t}.png"))]
+
+                def one(job):
+                    a, wm_name, folder, name = job
                     st_ = accts[a]
-                    out = os.path.join(tmp, f"{clip_id}_A{a}.mp4")
+                    out = os.path.join(tmp, name)
                     render(src, out, a, words, static_caption(cell(r, "top"), "") if C.SHOW_HOOK else "", "#FFFFFF",
                            hook_font, st_["handle"] if C.SHOW_WATERMARK else "", st_["spot"], st_["zoom"],
                            window if manual else min(window + st_["trim"], max(dur - 3, 0)), tmp,
                            platform=cell(r, "platform") or "Twitch", streamer=cell(r, "streamer"),
-                           max_len=clip_len)
+                           max_len=clip_len, wm_name=wm_name)
                     if PREVIEWS:
                         subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", "3", "-i", out, "-frames:v", "1",
-                                        "-vf", "scale=360:640", os.path.join(PREVIEWS, f"{clip_id}_A{a}.jpg")])
-                    return a, out
+                                        "-vf", "scale=360:640", os.path.join(PREVIEWS, name.replace(".mp4", ".jpg"))])
+                    return folder, name, out
 
                 with ThreadPoolExecutor(max_workers=2) as pool:
-                    for a, out in pool.map(one, sorted(C.CHANNELS)):
-                        old = g.find_child(C.ACCOUNT_FOLDERS[a], f"{clip_id}_A{a}.mp4", folder=False)
+                    for folder, name, out in pool.map(one, jobs):
+                        old = g.find_child(folder, name, folder=False)
                         if old:
                             g.trash(old)  # re-edit replaces the older version (old one goes to Drive trash)
-                        g.upload(out, f"{clip_id}_A{a}.mp4", C.ACCOUNT_FOLDERS[a])
+                        g.upload(out, name, folder)
                         os.remove(out)
                         made += 1
                 if PREVIEWS and os.environ.get("PREVIEW_UPLOAD") == "yes":
@@ -253,7 +260,7 @@ def main():
                     g.touch(fid)  # raw is kept 1 more day from now, then the clean-up deletes it
                 except Exception as e:
                     print(f"{clip_id}: could not mark raw: {e}")
-                if C.DELETE_RAW_AFTER_EDIT and made == len(C.CHANNELS):
+                if C.DELETE_RAW_AFTER_EDIT and made == len(jobs):
                     try:
                         g.delete(fid)  # all 6 versions are safely in the account folders
                         put(rownum, "raw", "🗑 used (versions made)", clip_id)

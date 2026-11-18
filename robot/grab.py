@@ -65,7 +65,7 @@ def cleanup(g, now_et):
         return n
 
     # robot videos already in the Drive trash (delete button, replaced versions): delete for good
-    robot_name = re.compile(r"^\d{4}-.+-\d{3}(_A\d)?(_raw)?\.mp4$")
+    robot_name = re.compile(r"^\d{4}-.+-\d{3}(_A\d|_TT\d)?(_raw)?\.mp4$")
     n = 0
     for f in g.list_trashed_videos():
         if robot_name.match(f["name"]):
@@ -76,7 +76,7 @@ def cleanup(g, now_et):
     n += sweep(C.FOLDERS["new"][0], d["new"], recurse=True)
     n += sweep(C.FOLDERS["approved"][0], d["approved"])
     n += sweep(C.FOLDERS["hold"][0], d["hold"])
-    for fid in C.ACCOUNT_FOLDERS.values():
+    for fid in list(C.ACCOUNT_FOLDERS.values()) + list(C.TIKTOK_FOLDERS.values()):
         n += sweep(fid, d["ready"])
     return n
 
@@ -97,7 +97,7 @@ def purge_ids(g, ids):
 
 def purge_all(g):
     """One-off reset: delete every robot-made clip video in the clip folders (and empty date folders)."""
-    robot_name = re.compile(r"^\d{4}-.+-\d{3}(_A\d)?(_raw)?\.mp4$")
+    robot_name = re.compile(r"^\d{4}-.+-\d{3}(_A\d|_TT\d)?(_raw)?\.mp4$")
     n = 0
 
     def walk(fid):

@@ -180,10 +180,11 @@ WM_BOX = (360, 130)        # every watermark fits inside this box ...
 WM_RIGHT, WM_TOP = 40, 56  # ... anchored to the same top-right spot
 
 
-def watermark_png(acct, workdir):
+def watermark_png(acct, workdir, wm_name=None):
     """Channel logo scaled to fit the same top-right box on every video (None if no logo)."""
     from PIL import Image
-    src = os.path.join(WM_DIR, f"A{acct}.png")
+    wm_name = wm_name or f"A{acct}"
+    src = os.path.join(WM_DIR, f"{wm_name}.png")
     if not os.path.exists(src):
         return None
     im = Image.open(src).convert("RGBA")
@@ -191,13 +192,13 @@ def watermark_png(acct, workdir):
     im = im.resize((max(1, int(im.width * sc)), max(1, int(im.height * sc))), Image.LANCZOS)
     a = im.getchannel("A").point(lambda v: int(v * 0.92))  # tiny bit see-through
     im.putalpha(a)
-    out = os.path.join(workdir, f"wm_{acct}.png")
+    out = os.path.join(workdir, f"wm_{wm_name}.png")
     im.save(out)
     return out, im.size
 
 
 def render(src, out, acct, words, hook, hook_color, hook_font, handle, spot, zoom, trim, workdir,
-           platform="twitch", streamer="", max_len=25.0):
+           platform="twitch", streamer="", max_len=25.0, wm_name=None):
     src_w, src_h, dur = probe(src)
     pic = PICTURE[acct]
     fg_w, fg_h, top, bottom = video_box(src_w, src_h, zoom, pic["y_shift"])
@@ -205,20 +206,20 @@ def render(src, out, acct, words, hook, hook_color, hook_font, handle, spot, zoo
     length = min(dur - trim, max_len)
     shifted = [dict(w, start=w["start"] - trim, end=min(w["end"] - trim, length))
                for w in words if w["end"] > trim and w["start"] - trim < length - 0.15]
-    ass_path = os.path.join(workdir, f"a{acct}.ass")
+    ass_path = os.path.join(workdir, f"a{acct}_{wm_name or 'A'}.ass")
     with open(ass_path, "w", encoding="utf-8") as f:
         f.write(build_ass(shifted, acct, hook, hook_color, hook_font, handle, spot, length, (top, bottom)))
     extra_inputs, overlays = [], []
     if streamer:
-        credit_png = os.path.join(workdir, f"credit_{acct}.png")
+        credit_png = os.path.join(workdir, f"credit_{acct}_{wm_name or 'A'}.png")
         make_credit(platform, streamer, credit_png)
         extra_inputs.append(credit_png); overlays.append(("(W-w)/2", str(CREDIT_Y)))
-    wm = watermark_png(acct, workdir)
+    wm = watermark_png(acct, workdir, wm_name)
     if wm:
         (wm_path, (ww, wh)) = wm
         extra_inputs.append(wm_path); overlays.append((str(W - WM_RIGHT - ww), str(WM_TOP + (WM_BOX[1] - wh) // 2)))
     if hook:
-        hook_png = os.path.join(workdir, f"hook_{acct}.png")
+        hook_png = os.path.join(workdir, f"hook_{acct}_{wm_name or 'A'}.png")
         size = make_hook(hook, hook_png)
         if size:
             hy = max(top - size[1] - 36, 140) if bottom < H - 10 else 300

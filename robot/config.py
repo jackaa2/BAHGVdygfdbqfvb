@@ -82,3 +82,12 @@ TIKTOK_CHANNELS = {
     4: "gta6streamerworld",
     5: "gta6streamerhq",
 }
+TIKTOK_FOLDERS = {
+    1: "1Whb5OPVRDuYFWRXH-aRj9joVHGpSVuRE",   # gta6.streamer.highlights
+    2: "15_a-aTe5PL124r1socoIrflVCEOLEqs4",   # gta6streamertv
+    3: "1MUvekoULzP_R8S_jQ5G0ccKEkjLHl-Oz",   # gta6vcreels
+    4: "1BYqsUlSPN50V8qRsB2rq_6YF8GeajYxb",   # gta6streamerworld
+    5: "16kKYqtXSA5wyqIgqVzDJiMvNlSeIbHjH",   # gta6streamerhq
+}
+# TikTok version N = same video as YouTube version N, only the watermark differs (assets/watermarks/T{N}.png).
+# A TikTok account without a watermark file yet is skipped.
