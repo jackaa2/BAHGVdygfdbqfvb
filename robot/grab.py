@@ -43,7 +43,7 @@ def clip_key(url):
 # clip titles that almost always mean nudity / sexual content -> never grabbed (Claude also checks the video itself)
 NSFW_TITLE = re.compile(r"(?i)(🔞|\b18\+|nud(e|ity)|naked|nsfw|strip ?club|stripper|lap ?dance|boob|booba|titt|"
                         r"\bflash(ed|ing)?\b|topless|thong|onlyfans|\bporn|\bsex|goon(er|ing)?|horny|\bthirst|"
-                        r"twerk|\bass\b|\bbutt\b|gyat+)")
+                        r"twerk|\bass\b|\bbutt\b|gya+t+|\bstrip\b)")
 
 
 def is_gta(c, gta_ids):
