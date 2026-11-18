@@ -80,6 +80,8 @@ def keep_streamer(audio, segs, log=print):
     # 3. voice fingerprint: keep the person who talks the most
     try:
         long_ = [s for s in s2 if s["end"] - s["start"] >= MIN_EMB_SECONDS]
+        if len(long_) < 3:
+            log("   voice check: too little speech to compare voices, kept all")
         if len(long_) >= 3:
             embs = _embed([_seg_audio(audio, s) for s in long_])
             w = np.array([s["end"] - s["start"] for s in long_])
@@ -99,4 +101,5 @@ def keep_streamer(audio, segs, log=print):
                 s2 = s3
     except Exception as e:  # never lose captions because of this step
         log(f"   voice check skipped: {e}")
+    log(f"   speaker filter: kept {len(s2)}/{len(segs)} speech bits")
     return s2
