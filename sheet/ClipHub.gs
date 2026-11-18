@@ -466,9 +466,16 @@ function saveTrim(id, a, b, k) {
   const i = ids.findIndex(v => String(v[0]) === id);
   if (i < 0) throw new Error('clip not found');
   const r = HEADER_ROWS + 1 + i;
-  const len = Number(sh.getRange(r, c.LENGTH).getValue() || 0);
-  const full = a <= 0.05 && b >= len - 0.05;
-  sh.getRange(r, c.CUT).setValue(full ? '' : "'" + mmss_(a) + '-' + mmss_(b));
+  if (!c.CUT) throw new Error('the ✂️ CUT column is missing in the Control Panel');
+  a = Number(a); b = Number(b);
+  if (!(b > a)) throw new Error('end must be after start');
+  if (b - a > 60.05) throw new Error('max 1 minute');
+  const len = Number((c.LENGTH && sh.getRange(r, c.LENGTH).getValue()) || 0);
+  const full = a <= 0.05 && len && b >= len - 0.05;
+  const cell = sh.getRange(r, c.CUT);
+  cell.setNumberFormat('@');
+  cell.setValue(full ? '' : mmss_(a) + '-' + mmss_(b));
+  SpreadsheetApp.flush();
   return full ? 'Full clip' : mmss_(a) + '-' + mmss_(b);
 }
 
@@ -521,8 +528,11 @@ const TRIM_HTML = `
   const sel=document.getElementById('sel');sel.style.left=(a/L*100)+'%';sel.style.width=((b-a)/L*100)+'%';
   ta.textContent=f(a);tb.textContent=f(b);tl.textContent=(b-a).toFixed(1)+'s';}
  A.oninput=upd;B.oninput=upd;upd();
- document.getElementById('save').onclick=function(){this.textContent='Saving…';
-  google.script.run.withSuccessHandler(t=>{this.textContent='✅ Saved: '+t;this.textContent='✅ Saved: '+t+' (you can close this tab)'})
+ const btn=document.getElementById('save');
+ btn.onclick=function(){btn.textContent='Saving…';btn.disabled=true;
+  google.script.run
+   .withSuccessHandler(t=>{btn.textContent='✅ Saved: '+t+'  (you can close this tab)';btn.style.background='#16a34a';btn.disabled=false;})
+   .withFailureHandler(err=>{btn.textContent='❌ Not saved: '+(err&&err.message?err.message:err)+'  (tap to retry)';btn.style.background='#dc2626';btn.disabled=false;})
    .saveTrim('<?= id ?>',+A.value,+B.value,'<?= k ?>');};
 </script>`;
 
