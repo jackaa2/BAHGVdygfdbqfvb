@@ -15,6 +15,8 @@ from concurrent.futures import ThreadPoolExecutor
 from zoneinfo import ZoneInfo
 
 import config as C
+
+DONE = ("Ready to Post", "Scheduled", "Posted")   # finished clips: never edit these again
 from google_api import Google
 from render import FONTS_DIR, render
 from speaker import keep_streamer
