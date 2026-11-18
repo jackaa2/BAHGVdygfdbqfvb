@@ -77,28 +77,25 @@ def set_panel(g, sheet, head, rows, clip_id, values):
 
 
 def title_and_tags(hook, streamer, clip_id):
-    """Title = the hook on that video + as many trending tags as fit in YouTube's 100 characters.
-    Tags rotate per video (picked from TAG_BANK) so every post isn't identical."""
-    import random
-    rnd = random.Random(clip_id)               # same clip -> same tags if it's ever re-sent
+    """Title = the hook on that video + tags, under YouTube's 100 characters.
+    The hook always stays whole; tags are added best-first (TAG_BANK order) and the worst ones are the
+    ones that don't make it. Only if the hook can't fit next to #GTA6 #shorts does the hook get shortened."""
     bank = [t if t.startswith("#") else "#" + t for t in (C.TAG_BANK or []) if t.strip()]
-    core = [t for t in ("#GTA6", "#shorts") if t]
-    extra = [t for t in bank if t.lower() not in {c.lower() for c in core}]
-    rnd.shuffle(extra)
-    LIMIT = 95                       # a little under YouTube's 100: emojis can count double
-    must = core + extra[:C.MIN_TITLE_TAGS - len(core)] if C.MIN_TITLE_TAGS > len(core) else core
-    room = LIMIT - sum(len(t) + 1 for t in must)
+    core = ["#GTA6", "#shorts"]
+    ranked = list(dict.fromkeys(core + bank))          # best first, no repeats
+    LIMIT = 95                                         # a little under 100: emojis can count double
+    room = LIMIT - sum(len(t) + 1 for t in core)
     title = hook.strip()
-    if len(title) > room:            # the hook gets shorter (at a word break) so the tags always fit
+    if len(title) > room:                              # last resort: shorten the hook at a word break
         cut = title[:room].rsplit(" ", 1)[0].rstrip(" ,.-!?")
         title = cut if len(cut) >= room // 2 else title[:room].rstrip()
-    for t in must + [t for t in extra if t not in must]:
+    for t in ranked:
         if len(title) + 1 + len(t) <= LIMIT:
             title += " " + t
     streamer_tag = "#" + "".join(ch for ch in streamer if ch.isalnum())
-    desc_tags = " ".join(dict.fromkeys(core + [streamer_tag] + extra[:15]))
+    desc_tags = " ".join(dict.fromkeys(ranked[:2] + [streamer_tag] + ranked[2:17]))
     desc = f"🎥 {streamer} live on stream\n\n{desc_tags}"
-    yt_tags = ",".join(t.lstrip("#") for t in dict.fromkeys(core + [streamer_tag] + extra))[:480]
+    yt_tags = ",".join(t.lstrip("#") for t in dict.fromkeys(ranked[:2] + [streamer_tag] + ranked[2:]))[:480]
     return title, desc, yt_tags
 
 
