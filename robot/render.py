@@ -4,7 +4,7 @@ import os
 import re
 import subprocess
 
-from styles import CAPTION_STYLES, PICTURE
+from styles import CAPTION_STYLES, GRADIENT, PICTURE
 
 W, H = 1080, 1920
 FONTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fonts")
@@ -49,9 +49,9 @@ def build_ass(words, acct, hook, hook_color, hook_font, handle, spot, duration, 
     """video_box = (top_y, bottom_y) of the clip on the 1080x1920 canvas."""
     st = CAPTION_STYLES[acct]
     top, bottom = video_box
-    border_style = 3 if st["box"] else 1
-    back = ass_color("#000000", 0x40) if st["box"] else ass_color("#000000", 0x60)
-    outline_col = ass_color("#000000", 0x50) if st["box"] else ass_color(st["outline"])
+    border_style = 1
+    back = ass_color("#000000", 0x60)
+    outline_col = ass_color(st["outline"])
     hook_size = 104 if len(hook or "") < 28 else 88 if len(hook or "") < 50 else 74
     hook_y = max(top - 50, 260)
 
@@ -62,8 +62,8 @@ def build_ass(words, acct, hook, hook_color, hook_font, handle, spot, duration, 
         "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, "
         "Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, "
         "Alignment, MarginL, MarginR, MarginV, Encoding",
-        f"Style: Cap,{st['font']},{st['size']},{ass_color(st['text'])},{ass_color(st['active'])},"
-        f"{outline_col},{back},0,0,0,0,100,100,1,{st['tilt']},{border_style},{st['border']},{st['shadow']},"
+        f"Style: Cap,{st['font']},{st['size']},{ass_color(st['text'])},{ass_color(st['text'])},"
+        f"{outline_col},{back},0,0,0,0,100,100,1,0,{border_style},{st['border']},{st['shadow']},"
         f"5,70,70,0,1",
         f"Style: Hook,{hook_font},{hook_size},{ass_color(hook_color)},{ass_color(hook_color)},"
         f"{ass_color('#000000')},{ass_color('#000000', 0x70)},0,0,0,0,100,100,1,0,1,8,4,2,80,80,0,1",
@@ -96,35 +96,48 @@ def build_ass(words, acct, hook, hook_color, hook_font, handle, spot, duration, 
             y = top + pad
         lines.append(f"Dialogue: 1,0:00:00.00,{end_all},Mark,,0,0,0,,{{\\an{an}\\pos({x},{y})}}{ass_text(handle)}")
 
-    # word-by-word captions
+    # word-by-word captions: white line + the spoken word in the sunset gradient
     cap_y = min(st["y"], H - 260)
     cap_y = max(cap_y, bottom + 120) if bottom + 120 < H - 240 else bottom - 140
-    for ci, chunk in enumerate(chunk_words(words, st["words"])):
+    fs, p = st["size"], st["pop"]
+    for chunk in chunk_words(words, st["words"]):
+        texts = [ass_text(x["word"].strip()) for x in chunk]
+        texts = [t.upper() if st["upper"] else t for t in texts]
+        # keep the line on one row: shrink if it would be wider than the screen
+        est = sum(len(t) for t in texts) * fs * 0.62 + (len(texts) - 1) * fs * 0.3
+        sc = min(100, int(940 / est * 100)) if est else 100
+        head = f"{{\\an5\\pos({W // 2},{cap_y})\\q2\\fscx{sc}\\fscy{sc}}}"
+        h = fs * sc / 100
         for wi, w in enumerate(chunk):
             start = w["start"]
             end = chunk[wi + 1]["start"] if wi + 1 < len(chunk) else max(w["end"], start + 0.25)
-            parts = []
-            for k, x in enumerate(chunk):
-                t = ass_text(x["word"].strip())
-                if st["upper"]:
-                    t = t.upper()
-                if k == wi:
-                    col = st["active"]
-                    if st.get("alternate"):
-                        col = st["active"] if ci % 2 else st["text"]
-                    p = st["pop"]
-                    parts.append(f"{{\\c{ass_color(col)}\\fscx{p}\\fscy{p}\\t(0,90,\\fscx100\\fscy100)}}{t}"
-                                 f"{{\\c{ass_color(st['text'])}\\fscx100\\fscy100}}")
-                else:
-                    parts.append(t)
-            glow = ""
-            if st.get("glow"):
-                glow_line = (f"Dialogue: 0,{fmt_t(start)},{fmt_t(end)},Cap,,0,0,0,,"
-                             f"{{\\pos({W // 2},{cap_y})\\blur8\\bord14\\3c{ass_color(st['glow'])}"
-                             f"\\1a&HFF&}}{' '.join(ass_text(x['word'].strip()).upper() for x in chunk)}")
-                lines.append(glow_line)
-            lines.append(f"Dialogue: 1,{fmt_t(start)},{fmt_t(end)},Cap,,0,0,0,,{{\\pos({W // 2},{cap_y})}}"
-                         + " ".join(parts))
+            t0, t1 = fmt_t(start), fmt_t(end)
+
+            def line(show_all=True):
+                out = []
+                for k, t in enumerate(texts):
+                    pop = (f"{{\\fscx{sc * p // 100}\\fscy{sc * p // 100}\\t(0,90,\\fscx{sc}\\fscy{sc})}}"
+                           if k == wi else f"{{\\fscx{sc}\\fscy{sc}}}")
+                    out.append(f"{pop}{t}")
+                return " ".join(out)
+
+            # base: whole line white with black outline
+            lines.append(f"Dialogue: 1,{t0},{t1},Cap,,0,0,0,,{head}" + line(True))
+            # gradient: same layout, only the spoken word visible, painted in horizontal color bands
+            top_y, bot_y = cap_y - h * 0.42, cap_y + h * 0.42
+            n = len(GRADIENT)
+            for bi, colr in enumerate(GRADIENT):
+                y0 = int(top_y + (bot_y - top_y) * bi / n) if bi else 0
+                y1 = int(top_y + (bot_y - top_y) * (bi + 1) / n) if bi < n - 1 else H
+                words_txt = []
+                for k, t in enumerate(texts):
+                    pop = (f"\\fscx{sc * p // 100}\\fscy{sc * p // 100}\\t(0,90,\\fscx{sc}\\fscy{sc})"
+                           if k == wi else f"\\fscx{sc}\\fscy{sc}")
+                    alpha = "\\1a&H00&" if k == wi else "\\1a&HFF&"
+                    words_txt.append(f"{{{pop}{alpha}}}{t}")
+                lines.append(
+                    f"Dialogue: 2,{t0},{t1},Cap,,0,0,0,,{head}{{\\c{ass_color(colr)}\\3a&HFF&\\4a&HFF&"
+                    f"\\clip(0,{y0},{W},{y1})}}" + " ".join(words_txt))
     return "\n".join(lines) + "\n"
 
 

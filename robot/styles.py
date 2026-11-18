@@ -5,25 +5,19 @@ A font file dropped into Drive "0 - Brand Kit" is used for the HOOK text on ever
 (e.g. a GTA-style font you own the rights to).
 """
 
+# Same look on every channel: Titan One, white with black outline. The word being spoken turns into the
+# GTA 6 sunset gradient (orange -> pink -> purple). Channels still differ in words-per-line + position.
+FONT = "Titan One"
+GRADIENT = ["#FFC24A", "#FFA94D", "#FF8A5C", "#FF6B78", "#FF5596", "#E04FB4", "#B84DD6", "#9447F0"]
+
+_base = dict(font=FONT, size=96, upper=True, text="#FFFFFF", outline="#000000", border=7, shadow=3, pop=112)
 CAPTION_STYLES = {
-    1: dict(name="Vice Pop",          font="Anton",         size=104, upper=True,  words=3,
-            text="#FFFFFF", active="#FFE14D", outline="#000000", border=7, shadow=3,
-            box=False, pop=118, tilt=0,   y=1390),
-    2: dict(name="Neon Pink",         font="Bebas Neue",    size=124, upper=True,  words=2,
-            text="#FFFFFF", active="#FF4FA3", outline="#3A0A2A", border=6, shadow=0,
-            box=False, pop=112, tilt=0,   y=1410, glow="#FF4FA3"),
-    3: dict(name="Cyan Wave",         font="Archivo Black", size=82,  upper=True,  words=3,
-            text="#FFFFFF", active="#2EE6FF", outline="#06223A", border=7, shadow=2,
-            box=False, pop=110, tilt=0,   y=1380),
-    4: dict(name="Black Box",         font="Bungee",        size=88,  upper=True,  words=2,
-            text="#FFFFFF", active="#FF9A3C", outline="#000000", border=14, shadow=0,
-            box=True,  pop=106, tilt=0,   y=1400),
-    5: dict(name="One Word Punch",    font="Luckiest Guy",  size=132, upper=True,  words=1,
-            text="#FFF35C", active="#7CFF6B", outline="#000000", border=8, shadow=4,
-            box=False, pop=125, tilt=0,   y=1360, alternate=True),
-    6: dict(name="Sunset Comic",      font="Bangers",       size=116, upper=True,  words=4,
-            text="#FFB347", active="#FFFFFF", outline="#4B1D6E", border=7, shadow=3,
-            box=False, pop=112, tilt=-3,  y=1395),
+    1: dict(_base, name="3 words, low",      words=3, y=1400),
+    2: dict(_base, name="2 words, mid",      words=2, y=1360),
+    3: dict(_base, name="3 words, lower",    words=3, y=1440),
+    4: dict(_base, name="2 words, low",      words=2, y=1410),
+    5: dict(_base, name="1 big word",        words=1, y=1380, size=118),
+    6: dict(_base, name="3 words, mid",      words=3, y=1370),
 }
 
 # Small picture differences per channel (on top of Account Styles tab: zoom, watermark spot, trim).

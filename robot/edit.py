@@ -63,10 +63,10 @@ def brand_font(g, workdir):
             if f["name"].lower().endswith((".ttf", ".otf")):
                 dst = os.path.join(FONTS_DIR, re.sub(r"[^\w.]", "_", f["name"]))
                 g.download(f["id"], dst)
-                return TTFont(dst)["name"].getDebugName(1) or "Anton"
+                return TTFont(dst)["name"].getDebugName(1) or "Titan One"
     except Exception as e:
         print(f"brand font skipped: {e}")
-    return "Anton"
+    return "Titan One"
 
 
 _model = None
