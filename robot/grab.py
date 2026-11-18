@@ -73,6 +73,30 @@ def cleanup(g, now_et):
     return n
 
 
+def purge_all(g):
+    """One-off reset: delete every robot-made clip video in the clip folders (and empty date folders)."""
+    robot_name = re.compile(r"^\d{4}-.+-\d{3}(_A\d)?(_raw)?\.mp4$")
+    n = 0
+
+    def walk(fid):
+        nonlocal n
+        for f in g.list_children(fid):
+            if f["mimeType"] == "application/vnd.google-apps.folder":
+                walk(f["id"])
+                if re.match(r"^\d{4}-\d\d-\d\d$", f["name"]) and not g.list_children(f["id"]):
+                    g.delete(f["id"])
+            elif robot_name.match(f["name"]):
+                g.delete(f["id"]); n += 1
+
+    for fid, _ in C.FOLDERS.values():
+        if fid != C.FOLDERS["brand"][0]:
+            walk(fid)
+    for f in g.list_trashed_videos():
+        if robot_name.match(f["name"]):
+            g.delete(f["id"]); n += 1
+    print(f"PURGE: deleted {n} clip video(s)")
+
+
 def main():
     sheet = os.environ.get("SHEET_ID") or C.SHEET_ID_FALLBACK
     g = Google()
@@ -254,6 +278,9 @@ if __name__ == "__main__":
         print("Setup not finished yet, skipping this run. Missing secrets: " + ", ".join(missing))
         sys.exit(0)
     try:
+        if os.environ.get("PURGE_ALL", "").strip().lower() == "yes":
+            purge_all(Google())
+            sys.exit(0)
         main()
     except Exception as e:
         traceback.print_exc()

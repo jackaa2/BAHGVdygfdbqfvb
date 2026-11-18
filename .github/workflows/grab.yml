@@ -9,6 +9,10 @@ on:
         description: "TEST ONLY: grab from this Twitch category instead (e.g. Grand Theft Auto V). Leave blank for normal."
         required: false
         default: ""
+      purge_all:
+        description: "DANGER: delete ALL robot clip videos in the clip folders (type yes)"
+        required: false
+        default: ""
       test_max:
         description: "TEST ONLY: max clips to grab"
         required: false
@@ -40,4 +44,5 @@ jobs:
           SHEET_ID: ${{ secrets.SHEET_ID }}
           TEST_GAME: ${{ inputs.test_game }}
           TEST_MAX: ${{ inputs.test_max }}
+          PURGE_ALL: ${{ inputs.purge_all }}
         run: python grab.py
