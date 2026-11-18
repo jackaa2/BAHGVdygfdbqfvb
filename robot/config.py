@@ -15,7 +15,7 @@ MIN_VIEWS_TRACKED = 25                # clips from streamers on our list
 MIN_SECONDS, MAX_SECONDS = 6, 60
 PREFERRED_SECONDS = 60         # no length preference: any clip up to 1 min ranks on views alone
 LANGUAGES = {"en"}                      # skip non-English clips
-MAX_NEW_CLIPS_PER_RUN = 38              # every 30 min -> ~75 clips an hour
+MAX_NEW_CLIPS_PER_RUN = 60              # every 30 min -> ~75 clips an hour
 
 # Drive folders (fixed IDs, so renaming folders never breaks anything).
 # Names are applied automatically on every run.
@@ -99,4 +99,4 @@ NO_HOOK_TEXT = "⚠️ Claude couldn't write a hook - type your own here"
 # Only grab clips from these tiers on the Streamers + Links tab (T1, T2). Set to None to allow everyone again.
 ONLY_TIERS = {1, 2, 3}
 # ...except a GTA 6 clip from ANY streamer gets in once it's this popular (it still sorts after T1/T2)
-POPULAR_ANY_VIEWS = 500   # any streamer's GTA 6 clip gets in at 500+ views (sorted after T1-T3); None = tiers only
+POPULAR_ANY_VIEWS = 250   # any streamer's GTA 6 clip gets in at 500+ views (sorted after T1-T3); None = tiers only
