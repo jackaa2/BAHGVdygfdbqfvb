@@ -127,6 +127,8 @@ def handle_bad(g, sheet, review, now):
     hx = {h: i for i, h in enumerate(head)}
     cell = lambda r, h: str(r[hx[h]]).strip() if h in hx and len(r) > hx[h] else ""
     by_id = {cell(r, "Clip ID"): r for r in rows}
+    taken = {str(r[R_LIVE]).replace("swap:", "").strip() for r in review
+             if not is_header(r) and str(r[R_LIVE]).startswith("swap:")}   # already coming in for another row
     changed = False
     for i, r in enumerate(review):
         if is_header(r):
@@ -168,7 +170,7 @@ def handle_bad(g, sheet, review, now):
             if clip_id in by_id and cell(by_id[clip_id], "✅ YOUR DECISION") != "Reject":
                 set_panel(g, sheet, head, rows, clip_id, {"✅ YOUR DECISION": "Reject",
                                                           "Notes": f"🤖 swapped out: {reason}"})
-            cand = replacement(g, sheet, head, rows, cell, now, exclude={clip_id})
+            cand = replacement(g, sheet, head, rows, cell, now, exclude={clip_id} | taken)
             if not cand:
                 g.update_values(sheet, f"'{C.REVIEW_TAB}'!{L(R_STATUS)}{rn}",
                                 [["⚠️ No new clip to swap in yet - will retry every 30 min"]])
@@ -176,6 +178,7 @@ def handle_bad(g, sheet, review, now):
             set_panel(g, sheet, head, rows, cand, {"✅ YOUR DECISION": "Approve", "Status": "Waiting for Hook",
                                                    "Notes": f"🤖 AUTO swap {clip_id} ch{a}"})
             by_id.get(cand, [""] * len(head))
+            taken.add(cand)
             msg, pend = f"⏳ Swapping in a new clip ({reason})…", cand
         g.update_values(sheet, f"'{C.REVIEW_TAB}'!{L(R_STATUS)}{rn}:{L(R_LIVE)}{rn}", [[msg, f"swap:{pend}"]])
         print(f"👎 {clip_id} ch{a}: {reason} -> {'swap for ' + pend if swap else 'remake'}")
