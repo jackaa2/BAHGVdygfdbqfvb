@@ -13,6 +13,10 @@ on:
         description: "DANGER: delete ALL robot clip videos in the clip folders (type yes)"
         required: false
         default: ""
+      purge_ids:
+        description: "Delete the videos of these clip IDs (comma separated)"
+        required: false
+        default: ""
       test_max:
         description: "TEST ONLY: max clips to grab"
         required: false
@@ -45,4 +49,5 @@ jobs:
           TEST_GAME: ${{ inputs.test_game }}
           TEST_MAX: ${{ inputs.test_max }}
           PURGE_ALL: ${{ inputs.purge_all }}
+          PURGE_IDS: ${{ inputs.purge_ids }}
         run: python grab.py

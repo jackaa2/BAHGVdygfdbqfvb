@@ -73,6 +73,20 @@ def cleanup(g, now_et):
     return n
 
 
+def purge_ids(g, ids):
+    """Delete every video (raw + 6 versions) belonging to these clip IDs."""
+    n = 0
+    for cid in [x.strip() for x in ids.split(",") if x.strip()]:
+        safe_id = cid.replace("'", "")
+        r = g._req("GET", "https://www.googleapis.com/drive/v3/files", params={
+            "q": f"name contains '{safe_id}' and trashed = false and mimeType = 'video/mp4'",
+            "fields": "files(id,name)", "pageSize": 50})
+        for f in r.json().get("files", []):
+            if f["name"].startswith(safe_id):
+                g.delete(f["id"]); n += 1
+    print(f"PURGE IDS: deleted {n} video(s)")
+
+
 def purge_all(g):
     """One-off reset: delete every robot-made clip video in the clip folders (and empty date folders)."""
     robot_name = re.compile(r"^\d{4}-.+-\d{3}(_A\d)?(_raw)?\.mp4$")
@@ -301,6 +315,9 @@ if __name__ == "__main__":
         print("Setup not finished yet, skipping this run. Missing secrets: " + ", ".join(missing))
         sys.exit(0)
     try:
+        if os.environ.get("PURGE_IDS", "").strip():
+            purge_ids(Google(), os.environ["PURGE_IDS"])
+            sys.exit(0)
         if os.environ.get("PURGE_ALL", "").strip().lower() == "yes":
             purge_all(Google())
             sys.exit(0)
