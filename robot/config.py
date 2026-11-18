@@ -118,6 +118,13 @@ UPLOAD_POST_USERS = {1: "GTA6Highlights",   # -> Streamers In Leonida | GTA6 (@g
                      4: "ch1-leonida",      # -> GTA 6 TV (@streamersinvc)
                      5: "StreamersInGTA6"}  # -> StreamersInGTA6
 # (these are Upload-Post usernames, matched by the YouTube channel each one has connected)
+# Safety check before every post: if a profile is ever connected to ANOTHER one of our channels
+# (handle or name below), that channel's posting stops with a warning instead of posting to the wrong one.
+YT_IDENTITY = {1: ["gta6leonidaclip", "Streamers in Leonida"],
+               2: ["gta6vcstreamers", "Vice City Streamers"],
+               3: ["gta6twitchclip", "GTA 6 Streamer Highlights"],
+               4: ["streamersinvc", "GTA 6 TV"],
+               5: ["StreamersInGTA6", "Streamers In GTA 6"]}
 POST_EVERY_HOURS = 3          # one Short every 3 hours on each channel
 SLOT_JITTER_MIN = 25          # each post time is nudged by up to ± this many minutes (looks human, not :00 / :36)
 SLOT_MIN_APART_MIN = 7        # no two channels post within this many minutes of each other

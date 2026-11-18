@@ -6,6 +6,7 @@ Finished videos wait on the 🎬 Review tab. For each row:
   🔁 REDO + ⚠️ CONFIRM REDO ticked -> the clip goes back: new hooks from Claude, new videos, back to Review
 Off until POSTING_ENABLED = True and the UPLOAD_POST_KEY secret is set (redo works either way)."""
 import datetime as dt
+import json
 import os
 import re
 import sys
@@ -119,6 +120,34 @@ def redo_clip(g, sheet, head, rows, clip_id, file_id):
         except Exception:
             pass
     print(f"REDO {clip_id}")
+
+
+def wrong_channels(key):
+    """Channels whose Upload-Post profile is connected to a DIFFERENT one of our YouTube channels."""
+    norm = lambda x: re.sub(r"[^a-z0-9]", "", str(x).lower())
+    try:
+        r = requests.get("https://api.upload-post.com/api/uploadposts/users",
+                         headers={"Authorization": f"Apikey {key}"}, timeout=60)
+        profiles = {p.get("username"): p for p in (r.json().get("profiles") or []) if isinstance(p, dict)}
+    except Exception as e:
+        print(f"channel check skipped: {e}")
+        return {}
+    bad = {}
+    for a, user in C.UPLOAD_POST_USERS.items():
+        yt = (profiles.get(user) or {}).get("social_accounts", {}).get("youtube")
+        if not isinstance(yt, dict):
+            continue
+        blob = norm(json.dumps(yt))
+        shown = {k: v for k, v in yt.items() if re.search(r"name|handle|title|user|channel", k, re.I)
+                 and isinstance(v, (str, int))}
+        print(f"ch{a} -> Upload-Post '{user}' -> YouTube {shown}")
+        mine = any(norm(k) and norm(k) in blob for k in C.YT_IDENTITY.get(a, []))
+        other = [b for b, keys in C.YT_IDENTITY.items() if b != a
+                 and any(len(norm(k)) > 8 and norm(k) in blob for k in keys)]
+        if other and not mine:
+            bad[a] = other[0]
+            print(f"⚠️ ch{a} profile '{user}' looks connected to channel {other[0]} - not posting there")
+    return bad
 
 
 def handle_bad(g, sheet, review, now):
@@ -414,6 +443,8 @@ def main():
             if src_of.get(cid):
                 on_channel.add((src_of[cid], str(p[0]).strip()))
 
+    wrong = wrong_channels(key) if posting else {}
+
     head, rows = panel(g, sheet)
     drop = []
     with tempfile.TemporaryDirectory() as tmp:
@@ -449,6 +480,11 @@ def main():
                                     [[f"🚫 Already posted on Ch{a} - skipped", ""]])
                     print(f"{clip_id} ch{a}: already on that channel, skipped")
                     dupes += 1
+                    continue
+                if a in wrong:
+                    g.update_values(sheet, f"'{C.REVIEW_TAB}'!{L(R_STATUS)}{rn}",
+                                    [[f"⚠️ Upload-Post Ch{a} is linked to the wrong YouTube channel - fix, then re-tick"]])
+                    failed += 1
                     continue
                 user = C.UPLOAD_POST_USERS.get(a)
                 slot = next_slot(a, first)
