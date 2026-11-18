@@ -75,19 +75,19 @@ CHANNELS = {
 
 # TikTok accounts: own "Ready to Post (TikTok)" folder, one sub-folder each (watermarks to come: assets/watermarks/T1..T5.png)
 TIKTOK_ROOT_NAME = "4 - Ready to Post (TikTok)"
-TIKTOK_CHANNELS = {
+TIKTOK_CHANNELS = {   # same order as the TikTok account list
     1: "gta6.streamer.highlights",
-    2: "gta6streamertv",
+    2: "gta6streamerworld",
     3: "gta6vcreels",
-    4: "gta6streamerworld",
+    4: "gta6streamertv",
     5: "gta6streamerhq",
 }
 TIKTOK_FOLDERS = {
-    1: "1Whb5OPVRDuYFWRXH-aRj9joVHGpSVuRE",   # gta6.streamer.highlights
-    2: "15_a-aTe5PL124r1socoIrflVCEOLEqs4",   # gta6streamertv
-    3: "1MUvekoULzP_R8S_jQ5G0ccKEkjLHl-Oz",   # gta6vcreels
-    4: "1BYqsUlSPN50V8qRsB2rq_6YF8GeajYxb",   # gta6streamerworld
-    5: "16kKYqtXSA5wyqIgqVzDJiMvNlSeIbHjH",   # gta6streamerhq
+    1: "1Whb5OPVRDuYFWRXH-aRj9joVHGpSVuRE",   # gta6.streamer.highlights  (girl with controller)
+    2: "1BYqsUlSPN50V8qRsB2rq_6YF8GeajYxb",   # gta6streamerworld         (GTA 6 Streamer World)
+    3: "1MUvekoULzP_R8S_jQ5G0ccKEkjLHl-Oz",   # gta6vcreels               (GTA VI TV)
+    4: "15_a-aTe5PL124r1socoIrflVCEOLEqs4",   # gta6streamertv            (Leonida Reels phone)
+    5: "16kKYqtXSA5wyqIgqVzDJiMvNlSeIbHjH",   # gta6streamerhq            (GTA 6 Streamer HQ)
 }
 # TikTok version N = same video as YouTube version N, only the watermark differs (assets/watermarks/T{N}.png).
 # A TikTok account without a watermark file yet is skipped.
