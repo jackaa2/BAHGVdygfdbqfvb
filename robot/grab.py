@@ -121,6 +121,8 @@ def purge_all(g):
     for fid, _ in C.FOLDERS.values():
         if fid != C.FOLDERS["brand"][0]:
             walk(fid)
+    for fid in list(C.ACCOUNT_FOLDERS.values()) + list(C.TIKTOK_FOLDERS.values()):
+        walk(fid)  # channel folders (YouTube + TikTok), in case any sit outside the folders above
     for f in g.list_trashed_videos():
         if robot_name.match(f["name"]):
             g.delete(f["id"]); n += 1
