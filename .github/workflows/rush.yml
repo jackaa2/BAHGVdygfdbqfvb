@@ -1,0 +1,46 @@
+name: Rush - fresh popular clips for every channel
+
+on:
+  workflow_dispatch:
+    inputs:
+      per_channel:
+        description: "Clips per channel"
+        default: "5"
+      hours:
+        description: "Only clips grabbed in the last N hours"
+        default: "24"
+      top_up:
+        description: "yes = count videos already waiting on Review"
+        default: "no"
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  rush:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -q requests
+      - name: Pick the most popular fresh clips
+        id: rush
+        working-directory: robot
+        env:
+          RUSH_PER_CHANNEL: ${{ inputs.per_channel }}
+          RUSH_HOURS: ${{ inputs.hours }}
+          RUSH_TOP_UP: ${{ inputs.top_up }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
+          SHEET_ID: ${{ secrets.SHEET_ID }}
+        run: python -u rush.py
+      - name: Claude screens + writes hooks
+        if: steps.rush.outputs.picked == 'yes'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run hooks.yml -R ${{ github.repository }}

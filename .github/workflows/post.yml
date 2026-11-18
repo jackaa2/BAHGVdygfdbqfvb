@@ -4,6 +4,10 @@ name: Post approved videos (Review tab)
 # approved (✅) on YouTube through Upload-Post, remakes 👎 clips, and tidies the Review tab.
 on:
   workflow_dispatch:
+    inputs:
+      force_batch:
+        description: "yes = make the review reel now (once nothing is still being made)"
+        default: "no"
 
 permissions:
   contents: read
@@ -44,6 +48,7 @@ jobs:
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
           GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
           SHEET_ID: ${{ secrets.SHEET_ID }}
+          FORCE_BATCH: ${{ inputs.force_batch }}
         run: python -u poster.py
       - name: Start Claude on 👎 fixes now
         if: steps.post.outputs.fix == 'yes'

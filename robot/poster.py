@@ -314,7 +314,8 @@ def make_batch(g, sheet, review, now):
     if C.DAILY_BATCH_HOUR is not None:
         # one shift a day: everything made since yesterday goes into ONE reel, built before your review time
         made_today = any(is_header(r) and str(r[R_BATCH]).startswith(now.strftime("%m%d-")) for r in review)
-        if now.hour < C.DAILY_BATCH_HOUR or made_today:
+        rush = os.environ.get("FORCE_BATCH") == "yes" and not being_made(head, rows)
+        if (now.hour < C.DAILY_BATCH_HOUR or made_today) and not rush:
             print(f"Batch: {len(loose)} video(s) waiting for the daily reel ({C.DAILY_BATCH_HOUR}:00 ET)")
             return False
     elif oldest < dt.timedelta(minutes=C.BATCH_MAX_WAIT_MIN) and (being_made(head, rows) or len(loose) < C.BATCH_MIN_CLIPS):
