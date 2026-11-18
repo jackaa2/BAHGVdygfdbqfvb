@@ -151,8 +151,11 @@ DAILY_BATCH_HOUR = 9             # one review a day: the day's reel is built fro
                                 # None = a new batch whenever a set of clips is finished
 
 # 👎 dropdown on the Review tab: what's wrong -> what the robot does (instantly, the fix lands in the same row)
-# remakes: bad hook -> new hooks unlike the old one · captions -> bigger speech model · trim -> whole clip, no auto-cut
-BAD_REMAKE = ["Hook is bad", "Captions are off", "Trim / cut is off", "Looks wrong (watermark/credit)"]
+# remakes: bad hook -> new hooks unlike the old one · captions -> bigger speech model
+# trim: dead air -> starts just before the first word, ends just after the last · shorter -> best 30 s of talking
+BAD_REMAKE = ["Hook is bad", "Captions are off",
+              "Trim: cut dead air (start/end)", "Trim: shorter (best 30s)", "Trim: use the full clip",
+              "Looks wrong (watermark/credit)"]
 # swaps (a different clip comes in): problems in the clip itself
 BAD_SWAP = ["Boring / not funny", "Not GTA 6", "Nudity / NSFW", "Not English", "Audio problem", "Duplicate clip"]
 FEEDBACK_TAB = "🗒 Feedback"

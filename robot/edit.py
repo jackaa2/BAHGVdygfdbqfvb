@@ -84,6 +84,16 @@ def best_window(words, dur, length):
     return max(best, 0.0)
 
 
+def tight_window(words, start, end, dur):
+    """Cut the dead air: from just before the first word to a beat after the last one (inside start..end)."""
+    inside = [w for w in words if w["start"] >= start - 0.05 and w["end"] <= end + 0.05]
+    if not inside:
+        return start, end - start
+    a = max(start, inside[0]["start"] - 0.4)
+    b = min(end, dur, inside[-1]["end"] + 1.2)
+    return a, max(b - a, 1.0)
+
+
 def file_id(cell):
     m = re.search(r"(?:/d/|id=)([-\w]{20,})", str(cell))
     return m.group(1) if m else None
@@ -229,8 +239,14 @@ def main():
                     if b0 <= a0 + 0.5:
                         raise RuntimeError(f"✂️ CUT ({cell(r, 'cut')}): end must be after start")
                     window, clip_len = a0, min(b0 - a0, C.MAX_CLIP_SECONDS)
-                elif "Trim / cut is off" in fix:   # 👎 the auto-cut was wrong: use the whole clip instead
+                elif "Trim: use the full clip" in fix or "Trim / cut is off" in fix:   # 👎 whole clip, no auto-cut
                     window, clip_len = 0.0, min(dur, C.MAX_CLIP_SECONDS)
+                elif "Trim: cut dead air" in fix:       # 👎 tighter: lose the quiet start / end
+                    w0 = best_window(words, dur, C.MAX_CLIP_SECONDS)
+                    window, clip_len = tight_window(words, w0, min(dur, w0 + C.MAX_CLIP_SECONDS), dur)
+                elif "Trim: shorter" in fix:            # 👎 just the best 30 s of talking, tightened
+                    w0 = best_window(words, dur, 30.0)
+                    window, clip_len = tight_window(words, w0, min(dur, w0 + 30.0), dur)
                 else:
                     window, clip_len = best_window(words, dur, C.MAX_CLIP_SECONDS), C.MAX_CLIP_SECONDS
                 made = 0
@@ -252,7 +268,7 @@ def main():
                     hook_text = per_channel.get(a, cell(r, "top")) if wm_name.startswith("A") else cell(r, "top")
                     render(src, out, a, words, static_caption(hook_text, "") if C.SHOW_HOOK else "", "#FFFFFF",
                            hook_font, st_["handle"] if C.SHOW_WATERMARK else "", st_["spot"], st_["zoom"],
-                           window if (manual or "Trim / cut is off" in fix) else min(window + st_["trim"], max(dur - 3, 0)), tmp,
+                           window if (manual or "Trim" in fix) else min(window + st_["trim"], max(dur - 3, 0)), tmp,
                            platform=cell(r, "platform") or "Twitch", streamer=cell(r, "streamer"),
                            max_len=clip_len, wm_name=wm_name)
                     if PREVIEWS:
