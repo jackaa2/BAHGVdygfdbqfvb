@@ -35,14 +35,15 @@ The images are 4 frames from the clip, in order.
 Reply with ONLY this JSON, nothing else:
 {{"postable": true, "reason": "<max 12 words>", "hooks": ["<1>", "<2>", "<3>", "<4>", "<5>"]}}
 
-"postable": false if the clip is not worth posting: nothing happens (loading screens, menus, dead air, AFK),
+"postable": false if the clip is not worth posting: it is not GTA 6 (another game, or just talking with
+no GTA 6 on screen or being discussed), nothing happens (loading screens, menus, dead air, AFK),
 it isn't a streamer moment, it's mostly non-English, it's unwatchable, or it's mainly hateful / sexual content.
 Otherwise true. "reason": why, in a few words.
 
 Hook rules: 5 DIFFERENT on-screen top lines (each one goes on a different channel, so no two may be
 near-copies), each max 45 characters, punchy, curiosity or reaction style (e.g. "Kai was NOT ready for this 😭",
 "Speed broke the game in 5 seconds"), use the streamer's name when it helps, no hashtags, no quotes, nothing
-false about what happens in the clip. Use 5 different angles (reaction, curiosity, bold claim, question,
+false about what happens in the clip, no timestamps, never name a different game. Use 5 different angles (reaction, curiosity, bold claim, question,
 chat/hype). End two or three of them with one fitting emoji (like 😭 💀 😂 🔥 😳 🤯); leave the rest without.
 Keep them clean: nothing hateful or sexual."""
 
@@ -213,7 +214,12 @@ def main():
                 try:  # tell the user in the sheet so they can type their own
                     ids = g.get_values(sheet, f"'{C.PANEL_TAB}'!A{C.HEADER_ROWS + 1}:A")
                     hit = [C.HEADER_ROWS + 1 + i for i, x in enumerate(ids) if x and str(x[0]).strip() == clip_id]
-                    if hit:
+                    if hit and cell(r, "notes").startswith(AUTO_TAG):
+                        # robot's own pick: drop it, the next grab picks a replacement
+                        g.update_values(sheet, f"'{C.PANEL_TAB}'!{col_letter(col['decision'])}{hit[0]}", [["Reject"]])
+                        g.update_values(sheet, f"'{C.PANEL_TAB}'!{col_letter(col['notes'])}{hit[0]}",
+                                        [[f"{AUTO_TAG} skipped: Claude couldn't write hooks"]])
+                    elif hit:
                         g.update_values(sheet, f"'{C.PANEL_TAB}'!{col_letter(col['top'])}{hit[0]}",
                                         [[C.NO_HOOK_TEXT]])
                 except Exception:
