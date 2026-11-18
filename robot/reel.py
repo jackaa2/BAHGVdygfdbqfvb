@@ -7,7 +7,7 @@ import tempfile
 FONT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fonts", "TitanOne-Regular.ttf")
 W, H, FPS = 540, 960, 30
 ENC = ["-c:v", "libx264", "-preset", "veryfast", "-crf", "28", "-pix_fmt", "yuv420p", "-r", str(FPS),
-       "-c:a", "aac", "-b:a", "96k", "-ar", "44100", "-ac", "2"]
+       "-video_track_timescale", "15360", "-c:a", "aac", "-b:a", "96k", "-ar", "44100", "-ac", "2"]
 
 
 def _has_audio(path):
@@ -55,6 +55,8 @@ def make_reel(items, out):
         lst = os.path.join(tmp, "list.txt")
         with open(lst, "w") as f:
             f.writelines(f"file '{p}'\n" for p in parts)
-        subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", lst, "-c", "copy",
-                        "-movflags", "+faststart", out], check=True, capture_output=True, text=True, timeout=300)
+        # one clean re-encode of the whole reel: every player (Drive's too) plays it start to finish
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-fflags", "+genpts", "-f", "concat", "-safe", "0",
+                        "-i", lst, "-af", "aresample=async=1:first_pts=0", *ENC, "-movflags", "+faststart", out],
+                       check=True, capture_output=True, text=True, timeout=1500)
     return out

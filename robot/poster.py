@@ -158,8 +158,9 @@ def make_batch(g, sheet, review, now):
         return False
     head, rows = panel(g, sheet)
     ages = [now - (parse_et(review[i][R_ADDED]) or now - dt.timedelta(days=1)) for i in loose]
-    if being_made(head, rows) and max(ages) < dt.timedelta(minutes=C.BATCH_MAX_WAIT_MIN):
-        print(f"Batch: {len(loose)} video(s) waiting, robot still making more")
+    oldest = max(ages)
+    if oldest < dt.timedelta(minutes=C.BATCH_MAX_WAIT_MIN) and (being_made(head, rows) or len(loose) < C.BATCH_MIN_CLIPS):
+        print(f"Batch: {len(loose)} video(s) waiting for more before making a reel")
         return False
     loose = loose[:C.BATCH_MAX_CLIPS]
     loose.sort(key=lambda i: (int(review[i][R_CH] or 0), i))   # organised by channel: Ch1 first ... Ch5 last
@@ -187,7 +188,7 @@ def make_batch(g, sheet, review, now):
     for n, i in enumerate(loose, 1):
         r = list(review[i])
         r[R_NAME] = f"#{n} · Ch{r[R_CH]} · {C.CHANNELS.get(int(r[R_CH]), '')}"
-        r[R_POST], r[R_BAD], r[R_BATCH], r[R_STATUS] = "", False, bid, "in batch above"
+        r[R_POST], r[R_BAD], r[R_BATCH], r[R_STATUS] = False, False, bid, "👀 In the reel above"
         clips.append(r)
     delete_rows(g, sheet, loose)
     where = g.append_rows(sheet, f"'{C.REVIEW_TAB}'!A{C.REVIEW_HEADER_ROW}:M", [header] + clips)
@@ -203,7 +204,8 @@ def make_batch(g, sheet, review, now):
                                              "startColumnIndex": R_BAD, "endColumnIndex": R_BAD + 1},
                                    "rule": {"condition": {"type": "BOOLEAN"}}}},
             {"setDataValidation": {"range": {"sheetId": gid, "startRowIndex": first, "endRowIndex": last,
-                                             "startColumnIndex": R_POST, "endColumnIndex": R_POST + 1}}},
+                                             "startColumnIndex": R_POST, "endColumnIndex": R_POST + 1},
+                                   "rule": {"condition": {"type": "BOOLEAN"}}}},
         ])
     print(f"Batch {bid}: {len(loose)} clip(s), reel {'ok' if reel_fid else 'FAILED'}")
     return True
@@ -264,7 +266,11 @@ def main():
                 continue
             auto = (C.AUTO_POST_AFTER_HOURS and parse_et(h[R_ADDED]) and
                     now - parse_et(h[R_ADDED]) > dt.timedelta(hours=C.AUTO_POST_AFTER_HOURS))
-            if not (ticked(h[R_POST]) or auto):
+            all_ = bool(ticked(h[R_POST]) or auto)
+            bid0 = str(h[R_BATCH]).strip()
+            singles = [r for r in review if not is_header(r) and str(r[R_BATCH]).strip() == bid0
+                       and ticked(r[R_POST]) and not str(r[R_STATUS]).startswith("📅")]
+            if not (all_ or singles):
                 continue
             if not posting:
                 g.update_values(sheet, f"'{C.REVIEW_TAB}'!J{hi + C.REVIEW_HEADER_ROW + 1}",
@@ -276,7 +282,9 @@ def main():
                 if is_header(r) or str(r[R_BATCH]).strip() != bid or str(r[R_STATUS]).startswith("📅"):
                     continue
                 clip_id, a, rn = str(r[R_ID]).strip(), int(r[R_CH]), i + C.REVIEW_HEADER_ROW + 1
-                if ticked(r[R_BAD]):
+                if not all_ and not ticked(r[R_POST]):
+                    continue          # only the ones you ticked one by one
+                if ticked(r[R_BAD]) and not ticked(r[R_POST]):
                     redo_clip(g, sheet, head, rows, clip_id, str(r[R_FILE]).strip())
                     drop.append(i); remade += 1
                     continue
@@ -331,6 +339,8 @@ def main():
             if failed:
                 note = note.replace("✅", "⏳", 1)
                 g.update_values(sheet, f"'{C.REVIEW_TAB}'!G{hi + C.REVIEW_HEADER_ROW + 1}", [[False]])
+            if not all_:   # only some clips posted one by one: the batch stays open for the rest
+                note = f"👀 {done} posted one by one · tick ✅ on the rest, or ✅ POST ALL here"
             g.update_values(sheet, f"'{C.REVIEW_TAB}'!J{hi + C.REVIEW_HEADER_ROW + 1}", [[note]])
     delete_rows(g, sheet, drop)
 
@@ -338,11 +348,13 @@ def main():
     review = read_review(g, sheet)
     old = []
     for hi, h in enumerate(review):
-        if not is_header(h) or not str(h[R_STATUS]).startswith("✅"):
+        if not is_header(h):
             continue
         bid = str(h[R_BATCH]).strip()
         mine = [i for i, r in enumerate(review) if not is_header(r) and str(r[R_BATCH]).strip() == bid]
         lives = [parse_et(review[i][R_LIVE]) for i in mine]
+        if not str(h[R_STATUS]).startswith("✅") and not (mine and all(lives)):
+            continue
         if all(lives) and (not lives or now - max(lives) > dt.timedelta(days=1)):
             old += [hi] + mine
             if str(h[R_FILE]).strip():
