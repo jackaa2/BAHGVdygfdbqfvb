@@ -54,6 +54,9 @@ function onOpen() {
     .addItem('Re-check all decisions now', 'resyncAll')
     .addSeparator()
     .addItem('🗑 Delete all rejected clips…', 'deleteRejected')
+    .addSeparator()
+    .addItem('⏱ Connect robot timer (GitHub key)…', 'connectRobot')
+    .addItem('▶ Run grabber now', 'runGrabberNow')
     .addToUi();
 }
 
@@ -188,6 +191,66 @@ function deleteRejected() {
     (failed.length ? '\n\nCould not trash the video for: ' + failed.join(', ') : ''), ui.ButtonSet.OK);
 }
 
+// ---- Robot timer: kicks the GitHub robots on a schedule (backup for GitHub's own timer) ----
+const GH_REPO = 'jackaa2/gta6-clip-robot';
+
+function connectRobot() {
+  const ui = SpreadsheetApp.getUi();
+  const r = ui.prompt('Connect robot timer',
+    'Paste your GitHub key (starts with github_pat_). It is stored only inside this sheet\'s script.',
+    ui.ButtonSet.OK_CANCEL);
+  if (r.getSelectedButton() !== ui.Button.OK) return;
+  const token = r.getResponseText().trim();
+  if (!/^(github_pat_|ghp_)/.test(token)) { ui.alert('That does not look like a GitHub key.'); return; }
+  PropertiesService.getScriptProperties().setProperty('GH_TOKEN', token);
+  const code = dispatch_('grab.yml');
+  if (code !== 204) { ui.alert('GitHub said ' + code + '. Check the key has Actions: Read and write on gta6-clip-robot.'); return; }
+  ScriptApp.getProjectTriggers().filter(t => t.getHandlerFunction() === 'robotTick')
+    .forEach(t => ScriptApp.deleteTrigger(t));
+  ScriptApp.newTrigger('robotTick').timeBased().everyMinutes(10).create();
+  PropertiesService.getScriptProperties().setProperty('LAST_GRAB', String(Date.now()));
+  ui.alert('Robot timer connected', 'Grabber runs every 30 min, captions start right after you approve. ' +
+    'A grab is running now.', ui.ButtonSet.OK);
+}
+
+function dispatch_(workflow) {
+  const token = PropertiesService.getScriptProperties().getProperty('GH_TOKEN');
+  if (!token) return 0;
+  try {
+    return UrlFetchApp.fetch('https://api.github.com/repos/' + GH_REPO + '/actions/workflows/' + workflow + '/dispatches', {
+      method: 'post', contentType: 'application/json', muteHttpExceptions: true,
+      headers: { Authorization: 'Bearer ' + token, Accept: 'application/vnd.github+json' },
+      payload: JSON.stringify({ ref: 'main' }),
+    }).getResponseCode();
+  } catch (e) { return -1; }
+}
+
+function hasEditWork_() {
+  const sh = SpreadsheetApp.getActive().getSheetByName(PANEL);
+  const c = cols_(sh);
+  const last = sh.getLastRow();
+  if (last <= HEADER_ROWS || !c.DECISION || !c.STATUS) return false;
+  const d = sh.getRange(HEADER_ROWS + 1, c.DECISION, last - HEADER_ROWS, 1).getValues();
+  const st = sh.getRange(HEADER_ROWS + 1, c.STATUS, last - HEADER_ROWS, 1).getValues();
+  return d.some((v, i) => v[0] === 'Approve' && (st[i][0] === 'Approved' || st[i][0] === ''));
+}
+
+function robotTick() {
+  const p = PropertiesService.getScriptProperties();
+  const last = Number(p.getProperty('LAST_GRAB') || 0);
+  if (Date.now() - last >= 29 * 60 * 1000) {
+    dispatch_('grab.yml');
+    p.setProperty('LAST_GRAB', String(Date.now()));
+  }
+  if (hasEditWork_()) dispatch_('edit.yml');
+}
+
+function runGrabberNow() {
+  const code = dispatch_('grab.yml');
+  SpreadsheetApp.getUi().alert(code === 204 ? 'Grabber started. New clips show up in 2-3 minutes.'
+    : 'Could not start it (connect the robot timer first).');
+}
+
 function resyncAll() {
   const sh = SpreadsheetApp.getActive().getSheetByName(PANEL);
   const c = cols_(sh);
@@ -195,6 +258,14 @@ function resyncAll() {
   for (let r = HEADER_ROWS + 1; r <= last; r++) {
     if (sh.getRange(r, c.ID).getValue()) processRow_(sh, r, c);
   }
+}
+
+function kickEdit_() {
+  // at most one start per minute, even if several clips are approved at once
+  const p = PropertiesService.getScriptProperties();
+  if (Date.now() - Number(p.getProperty('LAST_EDIT_KICK') || 0) < 60 * 1000) return;
+  p.setProperty('LAST_EDIT_KICK', String(Date.now()));
+  dispatch_('edit.yml');
 }
 
 function processRow_(sh, r, c) {
@@ -213,6 +284,7 @@ function processRow_(sh, r, c) {
       const later = ['Editing', 'Ready to Post', 'Posted'].includes(cur);
       if (!(later && decision === 'Approve')) status.setValue(rule.status);
     }
+    if (decision === 'Approve') kickEdit_();
   } catch (err) {
     if (c.NOTES) sh.getRange(r, c.NOTES).setValue('⚠ Move failed: ' + err.message);
   }
