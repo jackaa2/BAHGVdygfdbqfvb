@@ -15,7 +15,7 @@ MIN_VIEWS_TRACKED = 100                # clips from streamers on our list
 MIN_SECONDS, MAX_SECONDS = 6, 60
 PREFERRED_SECONDS = 25         # clips up to this length are preferred; longer ones need ~40% more views
 LANGUAGES = {"en"}                      # skip non-English clips
-MAX_NEW_CLIPS_PER_RUN = 15              # keeps Drive + your queue under control
+MAX_NEW_CLIPS_PER_RUN = 15              # every 30 min -> ~30 clips an hour
 
 # Drive folders (fixed IDs, so renaming folders never breaks anything).
 # Names are applied automatically on every run.
@@ -62,3 +62,4 @@ CLEANUP_DAYS = {
 DELETE_RAW_AFTER_EDIT = False # raw is kept 1 day after editing (see CLEANUP_DAYS['approved'])
 STREAMER_ONLY_CAPTIONS = True  # skip game dialogue / donation voices / background chatter
 MAX_CLIP_SECONDS = 60.0       # hard cap; longer clips are cut to the 60 s with the most talking
+TRACKED_BOOST = 1.5           # clips from streamers on the Streamers + Links tab rank higher

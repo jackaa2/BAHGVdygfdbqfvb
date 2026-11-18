@@ -161,7 +161,8 @@ def main():
 
     todo = []
     for i, r in enumerate(rows):
-        if cell(r, "id") and cell(r, "decision") == "Approve" and cell(r, "status") != "Ready to Post":
+        if (cell(r, "id") and cell(r, "decision") == "Approve" and cell(r, "status") != "Ready to Post"
+                and cell(r, "top")):  # wait until a hook is picked in 🎯 TOP TEXT
             tries = re.findall(r"Edit failed \(try (\d+)\)", cell(r, "notes"))
             if tries and int(tries[-1]) >= 3:
                 continue  # gave up after 3 tries; re-pick Approve after fixing to retry

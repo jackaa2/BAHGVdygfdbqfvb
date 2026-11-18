@@ -46,22 +46,3 @@ jobs:
           TEST_MAX: ${{ inputs.test_max }}
           PURGE_ALL: ${{ inputs.purge_all }}
         run: python grab.py
-      - name: Cache speech model (screener)
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/huggingface
-          key: screener-whisper-base-en-v1
-      - name: Claude screens new clips (score, verdict, hooks)
-        if: ${{ inputs.purge_all != 'yes' }}
-        continue-on-error: true
-        working-directory: robot
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
-          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
-          GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
-          SHEET_ID: ${{ secrets.SHEET_ID }}
-        run: |
-          command -v ffprobe || (sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg)
-          pip install -q faster-whisper numpy
-          python screen.py

@@ -118,6 +118,7 @@ def main():
     g = Google()
     head = g.get_values(sheet, f"'{C.PANEL_TAB}'!A{C.HEADER_ROWS}:Z{C.HEADER_ROWS}")[0]
     need = {"id": "Clip ID", "streamer": "Streamer", "title": "Clip Title", "top": "🎯 TOP TEXT",
+            "decision": "✅ YOUR DECISION", "notes": "Notes",
             "views": "Views",
             "secs": "Length (s)", "platform": "Platform", "raw": "Raw File",
             "h1": "Hook 1", "h2": "Hook 2", "h3": "Hook 3"}
@@ -130,7 +131,9 @@ def main():
     def cell(r, k):
         return str(r[col[k]]).strip() if len(r) > col[k] else ""
 
-    todo = [r for r in rows if cell(r, "id") and not (cell(r, "h1") or cell(r, "h2") or cell(r, "h3"))][:MAX_PER_RUN]
+    # hooks are only written for clips you APPROVED (no tokens spent on clips you don't want)
+    todo = [r for r in rows if cell(r, "id") and cell(r, "decision") == "Approve"
+            and not (cell(r, "h1") or cell(r, "h2") or cell(r, "h3")) and not cell(r, "top")][:MAX_PER_RUN]
     gid = g.sheet_gid(sheet, C.PANEL_TAB)
     print(f"{len(todo)} clip(s) to screen")
     done = 0
@@ -171,7 +174,15 @@ def main():
                 os.remove(path)
             except Exception as e:
                 traceback.print_exc()
-                print(f"{clip_id}: screening failed: {e}")
+                print(f"{clip_id}: hooks failed: {e}")
+                try:  # tell the user in the sheet so they can type their own
+                    ids = g.get_values(sheet, f"'{C.PANEL_TAB}'!A{C.HEADER_ROWS + 1}:A")
+                    hit = [C.HEADER_ROWS + 1 + i for i, x in enumerate(ids) if x and str(x[0]).strip() == clip_id]
+                    if hit:
+                        g.update_values(sheet, f"'{C.PANEL_TAB}'!{col_letter(col['h1'])}{hit[0]}",
+                                        [["(Claude skipped this one - type your own TOP TEXT)"]])
+                except Exception:
+                    pass
     print(f"Wrote hooks for {done} clip(s)")
 
 

@@ -20,7 +20,7 @@ const PANEL = 'Control Panel';
 const STYLES = 'Account Styles';
 const HEADER_ROWS = 3;
 // Columns are found by their header text in row 3, so moving columns never breaks this.
-const HEAD = { TOPTEXT: '🎯 TOP TEXT', ID: 'Clip ID', RAWFILE: 'Raw File', DECISION: '✅ YOUR DECISION', DECIDED_BY: 'Decided By', STATUS: 'Status', NOTES: 'Notes' };
+const HEAD = { TOPTEXT: '🎯 TOP TEXT', H1: 'Hook 1', ID: 'Clip ID', RAWFILE: 'Raw File', DECISION: '✅ YOUR DECISION', DECIDED_BY: 'Decided By', STATUS: 'Status', NOTES: 'Notes' };
 // Internal keys (stored at setup) -> folder names shown in Drive.
 const NAMES = {
   '00_Brand': '0 - Brand Kit (logos + watermarks)',
@@ -139,6 +139,16 @@ function onDecisionEdit(e) {
   }
   const c = cols_(sh);
   const c1 = e.range.getColumn(), c2 = e.range.getLastColumn();
+  if (c.TOPTEXT && c.TOPTEXT >= c1 && c.TOPTEXT <= c2 && c.DECISION) {
+    for (let r = Math.max(e.range.getRow(), HEADER_ROWS + 1); r <= e.range.getLastRow(); r++) {
+      const top = String(sh.getRange(r, c.TOPTEXT).getValue()).trim();
+      if (top && String(sh.getRange(r, c.DECISION).getValue()).trim() === 'Approve') {
+        kickEdit_();
+        SpreadsheetApp.getActive().toast('Making the 6 versions now (3-5 min).', '🎬 Editing', 5);
+        break;
+      }
+    }
+  }
   if (!c.DECISION || c.DECISION < c1 || c.DECISION > c2) return;
   for (let r = Math.max(e.range.getRow(), HEADER_ROWS + 1); r <= e.range.getLastRow(); r++) processRow_(sh, r, c);
 }
@@ -226,14 +236,24 @@ function dispatch_(workflow) {
   } catch (e) { return -1; }
 }
 
-function hasEditWork_() {
+function work_() {
+  // what's waiting: approved clips without hooks (-> hooks robot), approved + hook picked (-> edit robot)
   const sh = SpreadsheetApp.getActive().getSheetByName(PANEL);
   const c = cols_(sh);
   const last = sh.getLastRow();
-  if (last <= HEADER_ROWS || !c.DECISION || !c.STATUS) return false;
-  const d = sh.getRange(HEADER_ROWS + 1, c.DECISION, last - HEADER_ROWS, 1).getValues();
-  const st = sh.getRange(HEADER_ROWS + 1, c.STATUS, last - HEADER_ROWS, 1).getValues();
-  return d.some((v, i) => v[0] === 'Approve' && st[i][0] !== 'Ready to Post');
+  const out = { hooks: false, edit: false };
+  if (last <= HEADER_ROWS || !c.DECISION || !c.STATUS || !c.TOPTEXT) return out;
+  const n = last - HEADER_ROWS;
+  const d = sh.getRange(HEADER_ROWS + 1, c.DECISION, n, 1).getValues();
+  const st = sh.getRange(HEADER_ROWS + 1, c.STATUS, n, 1).getValues();
+  const top = sh.getRange(HEADER_ROWS + 1, c.TOPTEXT, n, 1).getValues();
+  const h1 = c.H1 ? sh.getRange(HEADER_ROWS + 1, c.H1, n, 1).getValues() : top;
+  d.forEach((v, i) => {
+    if (v[0] !== 'Approve' || st[i][0] === 'Ready to Post') return;
+    if (String(top[i][0]).trim()) out.edit = true;
+    else if (!String(h1[i][0]).trim()) out.hooks = true;
+  });
+  return out;
 }
 
 function robotTick() {
@@ -250,7 +270,9 @@ function robotTick() {
     if (code === 204) p.setProperty('LAST_GRAB', String(Date.now()));
     else timerProblem_(code);
   }
-  if (hasEditWork_()) dispatch_('edit.yml');
+  const w = work_();
+  if (w.hooks) dispatch_('hooks.yml');
+  if (w.edit) dispatch_('edit.yml');
 }
 
 function timerProblem_(code) {
@@ -286,23 +308,20 @@ function resyncAll() {
   }
 }
 
-function kickEdit_() {
-  // at most one start per minute, even if several clips are approved at once
+function kick_(workflow, key) {
+  // at most one start per 45 s per robot, even if several clips change at once
   const p = PropertiesService.getScriptProperties();
-  if (Date.now() - Number(p.getProperty('LAST_EDIT_KICK') || 0) < 60 * 1000) return;
-  p.setProperty('LAST_EDIT_KICK', String(Date.now()));
-  dispatch_('edit.yml');
+  if (Date.now() - Number(p.getProperty(key) || 0) < 45 * 1000) return;
+  p.setProperty(key, String(Date.now()));
+  dispatch_(workflow);
 }
+
+function kickEdit_() { kick_('edit.yml', 'LAST_EDIT_KICK'); }
 
 function processRow_(sh, r, c) {
   const ids = JSON.parse(PropertiesService.getDocumentProperties().getProperty('FOLDERS') || '{}');
   if (!ids.ROOT || !c.DECISION || !c.RAWFILE) return;
   const decision = String(sh.getRange(r, c.DECISION).getValue()).trim();
-  if (decision === 'Approve' && c.TOPTEXT && !String(sh.getRange(r, c.TOPTEXT).getValue()).trim()) {
-    sh.getRange(r, c.DECISION).setValue('');   // must pick a hook first
-    SpreadsheetApp.getActive().toast('Pick a hook in 🎯 TOP TEXT first, then Approve.', '🎯 Hook needed', 6);
-    return;
-  }
   const rule = MOVE[decision];
   if (!rule) return;
   const fileId = extractId_(sh.getRange(r, c.RAWFILE));
@@ -315,7 +334,12 @@ function processRow_(sh, r, c) {
       const later = cur === 'Ready to Post';
       if (!(later && decision === 'Approve')) status.setValue(rule.status);
     }
-    if (decision === 'Approve') kickEdit_();
+    if (decision === 'Approve') {
+      const top = c.TOPTEXT ? String(sh.getRange(r, c.TOPTEXT).getValue()).trim() : '';
+      if (top) kickEdit_();
+      else { kick_('hooks.yml', 'LAST_HOOK_KICK');
+             SpreadsheetApp.getActive().toast('Claude is writing 3 hooks (about 1 min). Then pick one in 🎯 TOP TEXT.', '✅ Approved', 6); }
+    }
   } catch (err) {
     if (c.NOTES) sh.getRange(r, c.NOTES).setValue('⚠ Move failed: ' + err.message);
   }
