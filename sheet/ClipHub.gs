@@ -499,7 +499,7 @@ function doGet(e) {
   const t = HtmlService.createTemplate(TRIM_HTML);
   t.id = id; t.fileId = fileId; t.len = Math.min(len, 600); t.k = e.parameter.k;
   t.a = cut && cut !== -1 ? cut[0] : 0;
-  t.b = cut && cut !== -1 ? cut[1] : Math.min(len, 60);
+  t.b = cut && cut !== -1 ? cut[1] : Math.min(len, 180);
   return t.evaluate().setTitle('✂️ Trim ' + id).addMetaTag('viewport', 'width=device-width, initial-scale=1');
 }
 
@@ -521,7 +521,7 @@ function saveTrim(id, a, b, k) {
   if (!c.CUT) throw new Error('the ✂️ CUT column is missing in the Control Panel');
   a = Number(a); b = Number(b);
   if (!(b > a)) throw new Error('end must be after start');
-  if (b - a > 60.05) throw new Error('max 1 minute');
+  if (b - a > 180.05) throw new Error('max 3 minutes');
   const len = Number((c.LENGTH && sh.getRange(r, c.LENGTH).getValue()) || 0);
   const full = a <= 0.05 && len && b >= len - 0.05;
   const cell = sh.getRange(r, c.CUT);
@@ -543,7 +543,7 @@ function parseCut_(v) {
   const p = t.split(/\s*[-–]\s*/);
   if (p.length !== 2) return -1;
   const a = secs_(p[0]), b = secs_(p[1]);
-  if (a === null || b === null || a < 0 || b < 0 || b <= a || b - a > 60) return -1;
+  if (a === null || b === null || a < 0 || b < 0 || b <= a || b - a > 180) return -1;
   return [a, b];
 }
 
@@ -568,13 +568,13 @@ const TRIM_HTML = `
  <input type="range" id="b" min="0" max="<?= len ?>" step="0.5" value="<?= b ?>">
 </div>
 <div class="row"><span>START <span id="ta"></span></span><span id="tl"></span><span>END <span id="tb"></span></span></div>
-<div class="hint">Watch the clip above, drag the orange handles. Max 1 minute.</div>
+<div class="hint">Watch the clip above, drag the orange handles. Max 3 minutes.</div>
 <button id="save">✂️ Save trim</button>
 <script>
  const A=document.getElementById('a'),B=document.getElementById('b'),L=<?= len ?>;
  const f=x=>{x=+x;const m=Math.floor(x/60),s=(x-m*60).toFixed(1).replace('.0','');return m+':'+(s<10?'0':'')+s};
  function upd(e){let a=+A.value,b=+B.value;
-  if(b-a>60){ if(e&&e.target===A) b=a+60; else a=b-60; }
+  if(b-a>180){ if(e&&e.target===A) b=a+180; else a=b-180; }
   if(b<=a+0.5){ if(e&&e.target===A) a=Math.max(0,b-0.5); else b=Math.min(L,a+0.5); }
   A.value=a;B.value=b;
   const sel=document.getElementById('sel');sel.style.left=(a/L*100)+'%';sel.style.width=((b-a)/L*100)+'%';

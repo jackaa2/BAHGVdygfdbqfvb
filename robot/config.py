@@ -12,8 +12,8 @@ GAME_NAMES = ["Grand Theft Auto VI"]   # Twitch category to pull top clips from
 LOOKBACK_HOURS = 12                     # only clips made in the last N hours
 MIN_VIEWS_CATEGORY = 300               # GTA 6 category clips (any streamer)
 MIN_VIEWS_TRACKED = 25                # clips from streamers on our list
-MIN_SECONDS, MAX_SECONDS = 6, 60
-PREFERRED_SECONDS = 60         # no length preference: any clip up to 1 min ranks on views alone
+MIN_SECONDS, MAX_SECONDS = 6, 180    # grab clips up to 3 min
+PREFERRED_SECONDS = 180        # no length preference: any clip up to 3 min ranks on views alone
 LANGUAGES = {"en"}                      # skip non-English clips
 MAX_NEW_CLIPS_PER_RUN = 60              # every 30 min -> ~75 clips an hour
 
@@ -61,7 +61,7 @@ CLEANUP_DAYS = {
 }
 DELETE_RAW_AFTER_EDIT = False # raw is kept 1 day after editing (see CLEANUP_DAYS['approved'])
 STREAMER_ONLY_CAPTIONS = True  # skip game dialogue / donation voices / background chatter
-MAX_CLIP_SECONDS = 60.0       # hard cap; longer clips are cut to the 60 s with the most talking
+MAX_CLIP_SECONDS = 180.0      # hard cap (Shorts allow 3 min); longer clips are cut to the 3 min with the most talking
 TRACKED_BOOST = 1.5           # clips from streamers on the Streamers + Links tab rank higher
 
 # Channels (one per account folder). Account 6 is not used.
@@ -99,4 +99,4 @@ NO_HOOK_TEXT = "⚠️ Claude couldn't write a hook - type your own here"
 # Only grab clips from these tiers on the Streamers + Links tab (T1, T2). Set to None to allow everyone again.
 ONLY_TIERS = {1, 2, 3}
 # ...except a GTA 6 clip from ANY streamer gets in once it's this popular (it still sorts after T1/T2)
-POPULAR_ANY_VIEWS = 250   # any streamer's GTA 6 clip gets in at 500+ views (sorted after T1-T3); None = tiers only
+POPULAR_ANY_VIEWS = 250   # any streamer's GTA 6 clip gets in at 250+ views (sorted after T1-T3); None = tiers only
