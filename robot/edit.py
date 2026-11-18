@@ -27,6 +27,7 @@ if PREVIEWS:
 NEEDED = {"id": "Clip ID", "decision": "✅ YOUR DECISION", "status": "Status", "raw": "Raw File",
           "edited": "Edited Files", "notes": "Notes", "h1": "Hook 1", "h2": "Hook 2", "h3": "Hook 3",
           "streamer": "Streamer", "platform": "Platform", "title": "Clip Title", "top": "🎯 TOP TEXT", "send": "🚀 SEND"}
+OPTIONAL = {"start": "✂️ START", "end": "✂️ END"}
 
 
 def col_letter(i):  # 0-based -> A1 letter
@@ -47,6 +48,20 @@ def static_caption(hook, title):
     if len(re.sub(r"[^A-Za-z]", "", t)) < 3:   # junk titles like "???" or "10k" -> no static caption
         return ""
     return t[:70]
+
+
+def parse_time(t):
+    """'0:05', '1:02', '5', '5.5', '5s' -> seconds; '' or junk -> None"""
+    t = str(t or "").strip().lower().rstrip("s").lstrip("'")
+    if not t:
+        return None
+    try:
+        if ":" in t:
+            m, sec = t.split(":", 1)
+            return int(m) * 60 + float(sec)
+        return float(t)
+    except ValueError:
+        return None
 
 
 def best_window(words, dur, length):
@@ -139,7 +154,7 @@ def main():
     sheet = os.environ["SHEET_ID"]
     g = Google()
     head = g.get_values(sheet, f"'{C.PANEL_TAB}'!A{C.HEADER_ROWS}:Z{C.HEADER_ROWS}")[0]
-    col = {k: head.index(v) for k, v in NEEDED.items() if v in head}
+    col = {k: head.index(v) for k, v in {**NEEDED, **OPTIONAL}.items() if v in head}
     missing = [NEEDED[k] for k in NEEDED if k not in col]
     if missing:
         raise RuntimeError(f"Control Panel is missing column(s): {', '.join(missing)}")
@@ -147,7 +162,7 @@ def main():
     rows = g.get_values(sheet, f"'{C.PANEL_TAB}'!A{C.HEADER_ROWS + 1}:{last}", formulas=True)
 
     def cell(r, k):
-        return str(r[col[k]]).strip() if len(r) > col[k] else ""
+        return str(r[col[k]]).strip() if k in col and len(r) > col[k] else ""
 
     def put(rownum, k, value, clip_id=None):
         # rows can move while we work (e.g. the delete-rejected button), so find the clip's row again
@@ -186,7 +201,16 @@ def main():
                 words = transcribe(src)
                 from render import probe
                 dur = probe(src)[2]
-                window = best_window(words, dur, C.MAX_CLIP_SECONDS)
+                cut_a, cut_b = parse_time(cell(r, "start")), parse_time(cell(r, "end"))
+                manual = cut_a is not None or cut_b is not None
+                if manual:  # your ✂️ START / END from the sheet
+                    a0 = max(0.0, min(cut_a or 0.0, max(dur - 1, 0)))
+                    b0 = min(cut_b if cut_b is not None else dur, dur)
+                    if b0 <= a0 + 0.5:
+                        raise RuntimeError(f"✂️ END ({cell(r, 'end')}) must be after START ({cell(r, 'start')})")
+                    window, clip_len = a0, min(b0 - a0, C.MAX_CLIP_SECONDS)
+                else:
+                    window, clip_len = best_window(words, dur, C.MAX_CLIP_SECONDS), C.MAX_CLIP_SECONDS
                 hooks = {1: cell(r, "h1"), 2: cell(r, "h2"), 3: cell(r, "h3")}
                 made = 0
 
@@ -195,9 +219,9 @@ def main():
                     out = os.path.join(tmp, f"{clip_id}_A{a}.mp4")
                     render(src, out, a, words, static_caption(cell(r, "top"), "") if C.SHOW_HOOK else "", "#FFFFFF",
                            hook_font, st_["handle"] if C.SHOW_WATERMARK else "", st_["spot"], st_["zoom"],
-                           min(window + st_["trim"], max(dur - 3, 0)), tmp,
+                           window if manual else min(window + st_["trim"], max(dur - 3, 0)), tmp,
                            platform=cell(r, "platform") or "Twitch", streamer=cell(r, "streamer"),
-                           max_len=C.MAX_CLIP_SECONDS)
+                           max_len=clip_len)
                     if PREVIEWS:
                         subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", "3", "-i", out, "-frames:v", "1",
                                         "-vf", "scale=360:640", os.path.join(PREVIEWS, f"{clip_id}_A{a}.jpg")])

@@ -20,7 +20,7 @@ const PANEL = 'Control Panel';
 const STYLES = 'Account Styles';
 const HEADER_ROWS = 3;
 // Columns are found by their header text in row 3, so moving columns never breaks this.
-const HEAD = { SEND: '🚀 SEND', TOPTEXT: '🎯 TOP TEXT', H1: 'Hook 1', ID: 'Clip ID', RAWFILE: 'Raw File', DECISION: '✅ YOUR DECISION', DECIDED_BY: 'Decided By', STATUS: 'Status', NOTES: 'Notes' };
+const HEAD = { START: '✂️ START', END: '✂️ END', SEND: '🚀 SEND', TOPTEXT: '🎯 TOP TEXT', H1: 'Hook 1', ID: 'Clip ID', RAWFILE: 'Raw File', DECISION: '✅ YOUR DECISION', DECIDED_BY: 'Decided By', STATUS: 'Status', NOTES: 'Notes' };
 // Internal keys (stored at setup) -> folder names shown in Drive.
 const NAMES = {
   '00_Brand': '0 - Brand Kit (logos + watermarks)',
@@ -147,6 +147,11 @@ function onDecisionEdit(e) {
       const top = c.TOPTEXT ? String(sh.getRange(r, c.TOPTEXT).getValue()).trim() : '';
       if (!approved) { box.setValue(false); SpreadsheetApp.getActive().toast('Approve the clip first.', '🚀 Not yet', 5); continue; }
       if (!top) { box.setValue(false); SpreadsheetApp.getActive().toast('Pick a hook or type your own in 🎯 TOP TEXT first (or pick "(no top text)").', '🚀 Not yet', 7); continue; }
+      const a = c.START ? secs_(sh.getRange(r, c.START).getDisplayValue()) : null;
+      const b = c.END ? secs_(sh.getRange(r, c.END).getDisplayValue()) : null;
+      if (a === -1 || b === -1) { box.setValue(false); SpreadsheetApp.getActive().toast('✂️ START/END must look like 0:05 or 5.', '🚀 Not yet', 6); continue; }
+      if (a !== null && b !== null && b <= a) { box.setValue(false); SpreadsheetApp.getActive().toast('✂️ END must be after START.', '🚀 Not yet', 6); continue; }
+      if (a !== null && b !== null && b - a > 60) { box.setValue(false); SpreadsheetApp.getActive().toast('Max 1 minute between START and END.', '🚀 Not yet', 6); continue; }
       if (c.STATUS && String(sh.getRange(r, c.STATUS).getValue()) !== 'Ready to Post') sh.getRange(r, c.STATUS).setValue('Pending');
       kickEdit_();
       SpreadsheetApp.getActive().toast('Making the 6 versions now (3-5 min).', '🎬 Sent', 5);
@@ -157,7 +162,7 @@ function onDecisionEdit(e) {
 }
 
 // ---- Delete all rejected clips (button = checkbox in Control Panel M2, or the menu) ----
-const DELETE_BOX = 'P2';
+const DELETE_BOX = 'R2';
 const DELETED_TAB = 'Deleted Clips'; // hidden list so the robot never grabs a deleted clip again
 
 function deleteRejected() {
@@ -311,6 +316,15 @@ function resyncAll() {
   for (let r = HEADER_ROWS + 1; r <= last; r++) {
     if (sh.getRange(r, c.ID).getValue()) processRow_(sh, r, c);
   }
+}
+
+// '0:05' / '5' / '1:02' -> seconds; '' -> null; junk -> -1
+function secs_(v) {
+  const t = String(v || '').trim().toLowerCase().replace(/s$/, '');
+  if (!t) return null;
+  const m = t.match(/^(\d+):(\d+(?:\.\d+)?)$/);
+  if (m) return Number(m[1]) * 60 + Number(m[2]);
+  return /^\d+(\.\d+)?$/.test(t) ? Number(t) : -1;
 }
 
 function kick_(workflow, key) {

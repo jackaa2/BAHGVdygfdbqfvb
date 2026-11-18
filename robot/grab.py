@@ -229,6 +229,12 @@ def main():
     for c in [c for c in sorted(cands, key=lambda c: c["views"], reverse=True) if c["language"][:2] == "en"][:8]:
         print(f"   {c['views']:>6} views  {c['seconds']:>3}s  lang={c['language']!r}  {c['streamer']}  {c['url']}")
 
+    header = (g.get_values(sheet, f"'{C.PANEL_TAB}'!A{C.HEADER_ROWS}:Z{C.HEADER_ROWS}") or [[]])[0]
+    header = [str(h).strip() for h in header]
+
+    def hcol(name):
+        return header.index(name)
+
     # --- download + upload + log (each row is written as soon as its video is in Drive) ---
     ids = g.get_values(sheet, f"'{C.PANEL_TAB}'!A{C.HEADER_ROWS + 1}:A")
     last = max([i for i, r in enumerate(ids) if r and str(r[0]).strip()], default=-1)
@@ -254,9 +260,12 @@ def main():
             watch = f'=HYPERLINK("{c["url"]}","▶ watch")'
             # A ID | B Streamer | C Title | D Watch | E Score | F Verdict | G Decision | H By | I Status
             # J Views | K Length | L Platform | M Grabbed | N Raw File | O Edited | P-R Hook 1-3 | S Notes
-            row = ([clip_id, safe(c["streamer"]), safe(c["title"]), watch, "", "", "", "", "New",
-                    c["views"], c["seconds"], c["platform"], now_et.strftime("%Y-%m-%d %H:%M"),
-                    drive_link, ""] + [""] * 3 + (["🧪 TEST clip (not GTA 6)"] if test else [""]))
+            # build the row by column NAME, so moving/adding columns in the sheet never breaks this
+            vals = {"Clip ID": clip_id, "Streamer": safe(c["streamer"]), "Clip Title": safe(c["title"]),
+                    "▶ Watch": watch, "Status": "New", "Views": c["views"], "Length (s)": c["seconds"],
+                    "Platform": c["platform"], "Grabbed (ET)": now_et.strftime("%Y-%m-%d %H:%M"),
+                    "Raw File": drive_link, "Notes": "🧪 TEST clip (not GTA 6)" if test else ""}
+            row = [vals.get(h, "") for h in header]
             try:
                 ids = g.get_values(sheet, f"'{C.PANEL_TAB}'!A{C.HEADER_ROWS + 1}:A")  # re-check: rows may have moved
                 last = max([i for i, r in enumerate(ids) if r and str(r[0]).strip()], default=-1)
@@ -267,13 +276,13 @@ def main():
                     gid = g.sheet_gid(sheet, C.PANEL_TAB)
                     g.batch_update(sheet, [{"setDataValidation": {
                         "range": {"sheetId": gid, "startRowIndex": next_row - 1, "endRowIndex": next_row,
-                                  "startColumnIndex": 6, "endColumnIndex": 7},
+                                  "startColumnIndex": hcol("✅ YOUR DECISION"), "endColumnIndex": hcol("✅ YOUR DECISION") + 1},
                         "rule": {"condition": {"type": "ONE_OF_LIST", "values": [
                             {"userEnteredValue": v} for v in ("Approve", "Reject")]},
                             "showCustomUi": True, "strict": True}}},
                         {"setDataValidation": {
                         "range": {"sheetId": gid, "startRowIndex": next_row - 1, "endRowIndex": next_row,
-                                  "startColumnIndex": 7, "endColumnIndex": 8},
+                                  "startColumnIndex": hcol("🚀 SEND"), "endColumnIndex": hcol("🚀 SEND") + 1},
                         "rule": {"condition": {"type": "BOOLEAN"}}}}])
                 except Exception as e:
                     errors.append(f"{clip_id}: dropdown: {e}")
@@ -294,7 +303,7 @@ def main():
         u, l = used / 1e9, (limit / 1e9 if limit else 0)
         pct = u / l if l else 0
         color = "#e53935" if pct > 0.85 else "#fb8c00" if pct > 0.6 else "#43a047"
-        g.update_values(sheet, f"'{C.PANEL_TAB}'!K1:L1", [[
+        g.update_values(sheet, f"'{C.PANEL_TAB}'!M1:N1", [[
             f"💾 Drive: {u:.1f} of {l:.0f} GB ({pct:.0%})" if l else f"💾 Drive: {u:.1f} GB used",
             f'=SPARKLINE({pct:.4f},{{"charttype","bar";"max",1;"color1","{color}"}})']])
         if pct > 0.85:
