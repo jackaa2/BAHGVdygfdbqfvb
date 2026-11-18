@@ -18,7 +18,7 @@ import config as C
 from google_api import Google
 from render import FONTS_DIR, render
 from speaker import keep_streamer
-from channels import channel_hooks
+from channels import channel_hooks, add_review_rows
 from styles import HOOK_COLORS, HOOK_FOR
 
 ET = ZoneInfo("America/New_York")
@@ -319,18 +319,6 @@ def assign_channels():
     a = chans[_turn["n"] % len(chans)]
     _turn["n"] += 1
     return [a]
-
-
-def add_review_rows(g, sheet, rows):
-    """Finished videos go to the Review tab; nothing posts until someone ticks POST IT there."""
-    where = g.append_rows(sheet, f"'{C.REVIEW_TAB}'!A:L", rows)
-    m = re.search(r"![A-Z]+(\d+):[A-Z]+(\d+)", where or "")
-    if m:   # checkboxes only on the new rows
-        gid = g.sheet_gid(sheet, C.REVIEW_TAB)
-        g.batch_update(sheet, [{"setDataValidation": {
-            "range": {"sheetId": gid, "startRowIndex": int(m.group(1)) - 1, "endRowIndex": int(m.group(2)),
-                      "startColumnIndex": 6, "endColumnIndex": 9},
-            "rule": {"condition": {"type": "BOOLEAN"}}}}])
 
 
 def make_sample(g, sheet, rows, cell, clip_id):

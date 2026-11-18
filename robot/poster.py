@@ -99,11 +99,50 @@ def tidy(g, sheet, review, now):
                                for i in sorted(old, reverse=True)])
 
 
+def backfill(g, sheet, review):
+    """Finished clips that aren't on the Review tab yet (e.g. made before it existed) get added."""
+    from channels import channel_hooks
+    head, rows = panel(g, sheet)
+    need = ["Clip ID", "Status", "Streamer", "🎯 TOP TEXT"]
+    if any(h not in head for h in need):
+        return False
+    hx = {h: head.index(h) for h in head}
+    cell = lambda r, h: str(r[hx[h]]).strip() if h in hx and len(r) > hx[h] else ""
+    on_review = {str(r[R_ID]).strip() for r in review}
+    booked = {str(p[0]).strip() for p in (g.get_values(sheet, f"'{C.POSTS_TAB}'!D2:D") or []) if p}
+    turn = len(booked) + len(review)
+    add = []
+    for r in rows:
+        cid = cell(r, "Clip ID")
+        if not cid or cell(r, "Status") != "Ready to Post" or cid in on_review or cid in booked:
+            continue
+        hooks = channel_hooks(cell(r, "🎯 TOP TEXT"), [cell(r, f"Hook {k}") for k in range(1, 6)])
+        chans = sorted(C.CHANNELS) if C.POST_MODE == "all" else \
+            [sorted(C.CHANNELS)[(turn + k) % len(C.CHANNELS)] for k in range(len(C.CHANNELS))]
+        for a in chans:
+            fid = g.find_child(C.ACCOUNT_FOLDERS[a], f"{cid}_A{a}.mp4", folder=False)
+            if not fid:
+                continue
+            add.append([cid, a, C.CHANNELS[a], hooks.get(a, cell(r, "🎯 TOP TEXT")),
+                        f'=HYPERLINK("https://drive.google.com/file/d/{fid}/view","▶ watch")', cell(r, "Streamer"),
+                        False, False, False, "👀 Watch it, then tick POST IT", "", fid])
+            if C.POST_MODE != "all":
+                turn += 1
+                break
+    if add:
+        from channels import add_review_rows
+        add_review_rows(g, sheet, add)
+        print(f"Review: added {len(add)} finished video(s)")
+    return bool(add)
+
+
 def main():
     sheet = os.environ["SHEET_ID"]
     g = Google()
     review = [r + [""] * (12 - len(r)) for r in (g.get_values(sheet, f"'{C.REVIEW_TAB}'!A2:L", formulas=True) or [])]
     review = do_redos(g, sheet, review)
+    if backfill(g, sheet, review):
+        review = [r + [""] * (12 - len(r)) for r in (g.get_values(sheet, f"'{C.REVIEW_TAB}'!A2:L", formulas=True) or [])]
 
     key = os.environ.get("UPLOAD_POST_KEY")
     if not (C.POSTING_ENABLED and key):
