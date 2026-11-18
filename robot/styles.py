@@ -11,14 +11,16 @@ FONT = "Titan One"
 GRADIENT = ["#FFC24A", "#FFA94D", "#FF8A5C", "#FF6B78", "#FF5596", "#E04FB4", "#B84DD6", "#9447F0"]
 
 _base = dict(font=FONT, size=96, upper=True, text="#FFFFFF", outline="#000000", border=7, shadow=3, pop=112)
+CAPTION_MIDDLE = True   # captions sit in the middle of the post (over the lower half of the clip)
 CAPTION_STYLES = {
-    1: dict(_base, name="3 words, low",      words=3, y=1400),
-    2: dict(_base, name="2 words, mid",      words=2, y=1360),
-    3: dict(_base, name="3 words, lower",    words=3, y=1440),
-    4: dict(_base, name="2 words, low",      words=2, y=1410),
-    5: dict(_base, name="1 big word",        words=1, y=1380, size=118),
-    6: dict(_base, name="3 words, mid",      words=3, y=1370),
+    1: dict(_base, name="3 words",      words=3, y=1060),
+    2: dict(_base, name="2 words",      words=2, y=1020),
+    3: dict(_base, name="3 words",      words=3, y=1100),
+    4: dict(_base, name="2 words",      words=2, y=1080),
+    5: dict(_base, name="1 big word",   words=1, y=1040, size=118),
+    6: dict(_base, name="3 words",      words=3, y=1000),
 }
+CREDIT_Y = 1640          # top of the "[logo] streamer" credit pill
 
 # Small picture differences per channel (on top of Account Styles tab: zoom, watermark spot, trim).
 PICTURE = {

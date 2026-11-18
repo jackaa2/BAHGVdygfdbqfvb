@@ -60,3 +60,4 @@ CLEANUP_DAYS = {
 }
 DELETE_RAW_AFTER_EDIT = True  # approved raw clip is deleted once all 6 versions are in the account folders
 STREAMER_ONLY_CAPTIONS = True  # skip game dialogue / donation voices / background chatter
+MAX_CLIP_SECONDS = 25.0       # every version is cut to at most 25 s (the stretch with the most talking)

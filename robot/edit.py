@@ -25,7 +25,8 @@ PREVIEWS = os.environ.get("PREVIEW_DIR")
 if PREVIEWS:
     os.makedirs(PREVIEWS, exist_ok=True)
 NEEDED = {"id": "Clip ID", "decision": "✅ YOUR DECISION", "status": "Status", "raw": "Raw File",
-          "edited": "Edited Files", "notes": "Notes", "h1": "Hook 1", "h2": "Hook 2", "h3": "Hook 3"}
+          "edited": "Edited Files", "notes": "Notes", "h1": "Hook 1", "h2": "Hook 2", "h3": "Hook 3",
+          "streamer": "Streamer", "platform": "Platform"}
 
 
 def col_letter(i):  # 0-based -> A1 letter
@@ -35,6 +36,23 @@ def col_letter(i):  # 0-based -> A1 letter
         i, r = divmod(i - 1, 26)
         s = chr(65 + r) + s
     return s
+
+
+def best_window(words, dur, length):
+    """Start time of the `length`-second stretch with the most talking (clips are cut to 25 s)."""
+    if dur <= length:
+        return 0.0
+    best, best_n, t = 0.0, -1, 0.0
+    while t + length <= dur + 0.01:
+        n = sum(1 for w in words if w["start"] >= t and w["end"] <= t + length)
+        if n > best_n:
+            best, best_n = t, n
+        t += 0.5
+    # start a little before the first word so it doesn't cut in mid-sentence
+    first = [w["start"] for w in words if w["start"] >= best]
+    if first and first[0] - best > 0.6:
+        best = min(first[0] - 0.3, dur - length)
+    return max(best, 0.0)
 
 
 def file_id(cell):
@@ -154,6 +172,9 @@ def main():
                     raise RuntimeError("no raw file link")
                 src = g.download(fid, os.path.join(tmp, clip_id + "_raw.mp4"))
                 words = transcribe(src)
+                from render import probe
+                dur = probe(src)[2]
+                window = best_window(words, dur, C.MAX_CLIP_SECONDS)
                 hooks = {1: cell(r, "h1"), 2: cell(r, "h2"), 3: cell(r, "h3")}
                 made = 0
 
@@ -162,7 +183,9 @@ def main():
                     out = os.path.join(tmp, f"{clip_id}_A{a}.mp4")
                     render(src, out, a, words, hooks[HOOK_FOR[a]] if C.SHOW_HOOK else "", st_["hook_color"],
                            hook_font, st_["handle"] if C.SHOW_WATERMARK else "", st_["spot"], st_["zoom"],
-                           st_["trim"], tmp)
+                           min(window + st_["trim"], max(dur - 3, 0)), tmp,
+                           platform=cell(r, "platform") or "Twitch", streamer=cell(r, "streamer"),
+                           max_len=C.MAX_CLIP_SECONDS)
                     if PREVIEWS:
                         subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", "3", "-i", out, "-frames:v", "1",
                                         "-vf", "scale=360:640", os.path.join(PREVIEWS, f"{clip_id}_A{a}.jpg")])

@@ -4,7 +4,8 @@ import os
 import re
 import subprocess
 
-from styles import CAPTION_STYLES, GRADIENT, PICTURE
+from credit import make_credit
+from styles import CAPTION_MIDDLE, CAPTION_STYLES, CREDIT_Y, GRADIENT, PICTURE
 
 W, H = 1080, 1920
 FONTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fonts")
@@ -98,7 +99,7 @@ def build_ass(words, acct, hook, hook_color, hook_font, handle, spot, duration, 
 
     # word-by-word captions: white line + the spoken word in the sunset gradient
     cap_y = min(st["y"], H - 260)
-    if bottom < H - 10:  # clip sits in the middle: captions under it
+    if bottom < H - 10 and not CAPTION_MIDDLE:  # captions under the clip
         cap_y = max(cap_y, bottom + 120) if bottom + 120 < H - 240 else bottom - 140
     fs, p = st["size"], st["pop"]
     # clean the word list: drop empty words, keep time order, no negative lengths
@@ -175,15 +176,22 @@ def video_box(src_w, src_h, zoom, y_shift):
     return fg_w, fg_h, top, top + fg_h
 
 
-def render(src, out, acct, words, hook, hook_color, hook_font, handle, spot, zoom, trim, workdir):
+def render(src, out, acct, words, hook, hook_color, hook_font, handle, spot, zoom, trim, workdir,
+           platform="twitch", streamer="", max_len=25.0):
     src_w, src_h, dur = probe(src)
     pic = PICTURE[acct]
     fg_w, fg_h, top, bottom = video_box(src_w, src_h, zoom, pic["y_shift"])
     trim = max(0.0, min(trim, max(dur - 3, 0)))
-    shifted = [dict(w, start=w["start"] - trim, end=w["end"] - trim) for w in words if w["end"] > trim]
+    length = min(dur - trim, max_len)
+    shifted = [dict(w, start=w["start"] - trim, end=min(w["end"] - trim, length))
+               for w in words if w["end"] > trim and w["start"] - trim < length - 0.15]
     ass_path = os.path.join(workdir, f"a{acct}.ass")
     with open(ass_path, "w", encoding="utf-8") as f:
-        f.write(build_ass(shifted, acct, hook, hook_color, hook_font, handle, spot, dur - trim, (top, bottom)))
+        f.write(build_ass(shifted, acct, hook, hook_color, hook_font, handle, spot, length, (top, bottom)))
+    credit_png = os.path.join(workdir, f"credit_{acct}.png")
+    has_credit = bool(streamer)
+    if has_credit:
+        cw, _ = make_credit(platform, streamer, credit_png)
 
     vf = (
         f"[0:v]split=2[a][b];"
@@ -193,10 +201,12 @@ def render(src, out, acct, words, hook, hook_color, hook_font, handle, spot, zoo
            if fg_h >= H else f"[b]scale={fg_w}:{fg_h},crop=min({W}\\,iw):ih,")
         + f"eq=saturation={pic['sat']}:brightness={pic['bright']}[fg];"
         f"[bg][fg]overlay=(W-w)/2:{max(top, 0)},setsar=1,"
-        f"ass={ass_path}:fontsdir={FONTS_DIR}[v]"
+        f"ass={ass_path}:fontsdir={FONTS_DIR}" + ("[pre];[pre][1:v]overlay=(W-w)/2:" + str(CREDIT_Y) + "[v]"
+                                                  if has_credit else "[v]")
     )
-    cmd = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-ss", f"{trim:.2f}", "-i", src,
-           "-filter_complex", vf, "-map", "[v]", "-map", "0:a?",
+    cmd = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-ss", f"{trim:.2f}", "-t", f"{length:.2f}",
+           "-i", src] + (["-loop", "1", "-i", credit_png] if has_credit else []) + [
+           "-filter_complex", vf, "-t", f"{length:.2f}", "-map", "[v]", "-map", "0:a?",
            "-c:v", "libx264", "-preset", "superfast", "-crf", "23", "-maxrate", "4M", "-bufsize", "8M", "-pix_fmt", "yuv420p", "-r", "30",
            "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-map_metadata", "-1",
            "-movflags", "+faststart", out]
