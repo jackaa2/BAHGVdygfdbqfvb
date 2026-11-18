@@ -124,6 +124,49 @@ def cleanup_rows(g, sheet, now_et):
     return len(old)
 
 
+def clean_mp4(path):
+    """Re-wrap a downloaded clip as a plain MP4 (timestamps from 0, no extra data tracks, fast-start),
+    so Google Drive can play it in the trimmer and the editor never chokes on it. Never re-encodes."""
+    import shutil
+    if not shutil.which("ffmpeg"):
+        return False
+    out = path + ".clean.mp4"
+    r = subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", path, "-map", "0:v:0", "-map", "0:a:0?",
+                        "-c", "copy", "-dn", "-sn", "-avoid_negative_ts", "make_zero", "-reset_timestamps", "1",
+                        "-movflags", "+faststart", out], capture_output=True, text=True, timeout=180)
+    if r.returncode != 0 or not os.path.exists(out) or os.path.getsize(out) < 10000:
+        print(f"   (clean-up skipped: {r.stderr[-150:]})")
+        return False
+    os.replace(out, path)
+    return True
+
+
+def fix_raw_files(g):
+    """Clean every raw clip already in the sheet (same Drive file, same links)."""
+    sheet = os.environ["SHEET_ID"]
+    rows = g.get_values(sheet, f"'{C.PANEL_TAB}'!A{C.HEADER_ROWS}:Z", formulas=True)
+    head = [str(h).strip() for h in rows[0]]
+    ri, si, ii = head.index("Raw File"), head.index("Status"), head.index("Clip ID")
+    done = 0
+    with tempfile.TemporaryDirectory() as tmp:
+        for r in rows[1:]:
+            raw = str(r[ri]) if len(r) > ri else ""
+            m = re.search(r"/d/([-\w]+)", raw)
+            st = str(r[si]) if len(r) > si else ""
+            if not m or st == "Ready to Post":
+                continue
+            p = os.path.join(tmp, "raw.mp4")
+            try:
+                g.download(m.group(1), p)
+                if clean_mp4(p):
+                    g.update_media(m.group(1), p)
+                    done += 1
+                    print(f"fixed {r[ii]}")
+            except Exception as e:
+                print(f"{r[ii]}: {e}")
+    print(f"FIX RAW: cleaned {done} clip(s)")
+
+
 def purge_ids(g, ids):
     """Delete every video (raw + 6 versions) belonging to these clip IDs."""
     n = 0
@@ -315,6 +358,7 @@ def main():
                 subprocess.run(["yt-dlp", "-q", "--no-warnings", "-f", "mp4/best",
                                 "-o", path, c["url"]],
                                check=True, timeout=300, capture_output=True, text=True)
+                clean_mp4(path)
                 fid = g.upload(path, clip_id + ".mp4", day_folder)
             except subprocess.CalledProcessError as e:
                 errors.append(f"{clip_id}: download failed: {(e.stderr or '')[-200:]}"); continue
@@ -420,7 +464,9 @@ if __name__ == "__main__":
         print("Setup not finished yet, skipping this run. Missing secrets: " + ", ".join(missing))
         sys.exit(0)
     try:
-        if os.environ.get("PURGE_IDS", "").strip():
+        if os.environ.get("FIX_RAW", "").strip().lower() in ("yes", "true", "1"):
+            fix_raw_files(Google())
+        elif os.environ.get("PURGE_IDS", "").strip():
             purge_ids(Google(), os.environ["PURGE_IDS"])
             sys.exit(0)
         if os.environ.get("PURGE_ALL", "").strip().lower() == "yes":

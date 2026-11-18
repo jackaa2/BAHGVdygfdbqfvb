@@ -41,8 +41,9 @@ class Google:
         return h
 
     def _req(self, method, url, **kw):
+        extra = kw.pop("headers", None)
         for attempt in range(4):
-            r = requests.request(method, url, headers=self._h(kw.pop("headers", None)), timeout=120, **kw)
+            r = requests.request(method, url, headers=self._h(extra), timeout=120, **kw)
             if r.status_code in (429, 500, 502, 503):
                 time.sleep(2 ** attempt)
                 continue
@@ -191,6 +192,21 @@ class Google:
         if r2.status_code not in (200, 201):
             raise RuntimeError(f"Upload failed ({r2.status_code}): {r2.text[:300]}")
         return r2.json()["id"]
+
+    def update_media(self, file_id, path, mime="video/mp4"):
+        """Replace a file's contents (same ID, same links)."""
+        r = self._req("PATCH", f"{UPLOAD}/{file_id}?uploadType=resumable",
+                      headers={"Content-Type": "application/json; charset=UTF-8", "X-Upload-Content-Type": mime},
+                      data="{}")
+        session = r.headers["Location"]
+        with open(path, "rb") as f:
+            r2 = requests.put(session, data=f, headers={"Content-Type": mime}, timeout=600)
+        if r2.status_code not in (200, 201):
+            raise RuntimeError(f"Update failed ({r2.status_code}): {r2.text[:300]}")
+
+
+def _noop():
+    pass
 
 
 def folder_ids_from_panel(row2_formulas):
