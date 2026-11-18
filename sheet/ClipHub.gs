@@ -33,9 +33,9 @@ const NAMES = {
 };
 const ROOT_NAME = 'GTA6 Clip Hub - VIDEOS';
 const FOLDERS = Object.keys(NAMES);
-// Status is automatic and only ever: New -> Pending (approved, captions being made) -> Ready to Post
+// Status is automatic: New -> Waiting for Hook (approved) -> Pending (hook picked, captions cooking) -> Ready to Post
 const MOVE = {
-  Approve: { folder: '03_Approved', status: 'Pending' },
+  Approve: { folder: '03_Approved', status: 'Waiting for Hook' },
   Reject:  { folder: '06_Rejected', status: 'New' },
   Hold:    { folder: '02_Screened', status: 'New' },
   '':      { folder: '01_Raw', status: 'New' },
@@ -143,9 +143,11 @@ function onDecisionEdit(e) {
     for (let r = Math.max(e.range.getRow(), HEADER_ROWS + 1); r <= e.range.getLastRow(); r++) {
       const top = String(sh.getRange(r, c.TOPTEXT).getValue()).trim();
       if (top && String(sh.getRange(r, c.DECISION).getValue()).trim() === 'Approve') {
+        if (c.STATUS && String(sh.getRange(r, c.STATUS).getValue()) !== 'Ready to Post') {
+          sh.getRange(r, c.STATUS).setValue('Pending');
+        }
         kickEdit_();
         SpreadsheetApp.getActive().toast('Making the 6 versions now (3-5 min).', '🎬 Editing', 5);
-        break;
       }
     }
   }
@@ -332,7 +334,10 @@ function processRow_(sh, r, c) {
       const status = sh.getRange(r, c.STATUS);
       const cur = String(status.getValue());
       const later = cur === 'Ready to Post';
-      if (!(later && decision === 'Approve')) status.setValue(rule.status);
+      if (!(later && decision === 'Approve')) {
+        const hasTop = c.TOPTEXT && String(sh.getRange(r, c.TOPTEXT).getValue()).trim();
+        status.setValue(decision === 'Approve' && hasTop ? 'Pending' : rule.status);
+      }
     }
     if (decision === 'Approve') {
       const top = c.TOPTEXT ? String(sh.getRange(r, c.TOPTEXT).getValue()).trim() : '';
