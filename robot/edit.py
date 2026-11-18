@@ -174,6 +174,12 @@ def main():
                 put(rownum, "edited", '=HYPERLINK("https://drive.google.com/drive/folders/'
                     f'{C.FOLDERS["ready"][0]}","✅ 6 versions")', clip_id)
                 put(rownum, "status", "Ready to Post", clip_id)
+                if C.DELETE_RAW_AFTER_EDIT and made == 6:
+                    try:
+                        g.delete(fid)  # all 6 versions are safely in the account folders
+                        put(rownum, "raw", "🗑 used (versions made)", clip_id)
+                    except Exception as e:
+                        print(f"{clip_id}: could not delete raw: {e}")
                 print(f"{clip_id}: {made} versions, {len(words)} caption words")
             except Exception as e:
                 traceback.print_exc()

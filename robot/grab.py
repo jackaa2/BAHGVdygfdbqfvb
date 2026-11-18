@@ -56,8 +56,15 @@ def cleanup(g, now_et):
                 g.delete(f["id"]); n += 1
         return n
 
+    # robot videos already in the Drive trash (delete button, replaced versions): delete for good
+    robot_name = re.compile(r"^\d{4}-.+-\d{3}(_A\d)?(_raw)?\.mp4$")
+    n = 0
+    for f in g.list_trashed_videos():
+        if robot_name.match(f["name"]):
+            g.delete(f["id"]); n += 1
+
     d = C.CLEANUP_DAYS
-    n = sweep(C.FOLDERS["rejected"][0], d["rejected"])
+    n += sweep(C.FOLDERS["rejected"][0], d["rejected"])
     n += sweep(C.FOLDERS["new"][0], d["new"], recurse=True)
     n += sweep(C.FOLDERS["approved"][0], d["approved"])
     n += sweep(C.FOLDERS["hold"][0], d["hold"])
@@ -213,11 +220,17 @@ def main():
     except Exception as e:
         errors.append(f"clean-up: {e}")
 
-    # --- Drive space check ---
+    # --- Drive space meter (Control Panel J1:M1) ---
     try:
         used, limit = g.storage()
-        if limit and used / limit > 0.8:
-            errors.insert(0, f"DRIVE {used / limit:.0%} FULL ({used / 1e9:.1f} of {limit / 1e9:.0f} GB)")
+        u, l = used / 1e9, (limit / 1e9 if limit else 0)
+        pct = u / l if l else 0
+        color = "#e53935" if pct > 0.85 else "#fb8c00" if pct > 0.6 else "#43a047"
+        g.update_values(sheet, f"'{C.PANEL_TAB}'!K1:L1", [[
+            f"{u:.1f} of {l:.0f} GB ({pct:.0%})" if l else f"{u:.1f} GB used",
+            f'=SPARKLINE({pct:.4f},{{"charttype","bar";"max",1;"color1","{color}"}})']])
+        if pct > 0.85:
+            errors.insert(0, f"DRIVE {pct:.0%} FULL")
     except Exception as e:
         errors.append(f"storage check: {e}")
 

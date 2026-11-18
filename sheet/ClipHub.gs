@@ -163,8 +163,8 @@ function deleteRejected() {
 
   const ok = ui.alert('Are you sure?',
     'Delete ' + rows.length + ' rejected clip' + (rows.length > 1 ? 's' : '') + '?\n\n' +
-    'Their rows are removed from the Control Panel and their videos go to the Google Drive trash ' +
-    '(you can still restore them from the trash for 30 days).', ui.ButtonSet.YES_NO);
+    'Their rows are removed from the Control Panel and their videos are deleted for good ' +
+    '(frees Drive space within 30 minutes). This cannot be undone.', ui.ButtonSet.YES_NO);
   if (ok !== ui.Button.YES) return;
 
   let log = ss.getSheetByName(DELETED_TAB);

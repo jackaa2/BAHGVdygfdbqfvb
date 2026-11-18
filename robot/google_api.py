@@ -140,6 +140,19 @@ class Google:
         """Permanent delete (frees Drive space right away)."""
         self._req("DELETE", f"{DRIVE}/files/{file_id}")
 
+    def list_trashed_videos(self):
+        out, token = [], None
+        while True:
+            params = {"q": "trashed = true and mimeType = 'video/mp4' and 'me' in owners",
+                      "fields": "nextPageToken,files(id,name)", "pageSize": 1000}
+            if token:
+                params["pageToken"] = token
+            j = self._req("GET", f"{DRIVE}/files", params=params).json()
+            out += j.get("files", [])
+            token = j.get("nextPageToken")
+            if not token:
+                return out
+
     def list_children(self, parent_id):
         out, token = [], None
         while True:

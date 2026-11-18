@@ -48,13 +48,14 @@ WHISPER_MODEL = "small.en"    # speech-to-text for captions (free, runs on GitHu
 SHOW_HOOK = False             # hook text on top of the video (off: captions only)
 SHOW_WATERMARK = False        # turn on once the 6 channel watermarks are in
 
-CLEANUP_ENABLED = False       # OFF until Joe approves automatic deletion
+CLEANUP_ENABLED = True        # Joe approved (Nov 17): delete old robot files for good
 # Drive clean-up (robot-made files only, inside the clip folders). Free Drive is 15 GB and each
 # approved clip makes ~6 x 20 MB, so old files are deleted for good after these many days.
 CLEANUP_DAYS = {
-    "rejected": 7,      # videos in "6 - Rejected"
-    "new": 7,           # never-decided clips in "1 - New Clips"
-    "ready": 14,        # finished versions in "4 - Ready to Post/Account N"
-    "approved": 14,     # raw files in "3 - Approved"
-    "hold": 30,         # "2 - On Hold"
+    "rejected": 1,      # videos in "6 - Rejected" (the 🗑 button removes them right away)
+    "new": 3,           # never-decided clips in "1 - New Clips"
+    "hold": 3,          # "2 - On Hold"
+    "approved": 3,      # leftover raws in "3 - Approved" (normally deleted right after editing)
+    "ready": 3,         # finished versions in "4 - Ready to Post/Account N"
 }
+DELETE_RAW_AFTER_EDIT = True  # approved raw clip is deleted once all 6 versions are in the account folders
