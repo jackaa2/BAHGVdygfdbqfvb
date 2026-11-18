@@ -20,7 +20,7 @@ const PANEL = 'Control Panel';
 const STYLES = 'Account Styles';
 const HEADER_ROWS = 3;
 // Columns are found by their header text in row 3, so moving columns never breaks this.
-const HEAD = { TOPTEXT: '🎯 TOP TEXT', H1: 'Hook 1', ID: 'Clip ID', RAWFILE: 'Raw File', DECISION: '✅ YOUR DECISION', DECIDED_BY: 'Decided By', STATUS: 'Status', NOTES: 'Notes' };
+const HEAD = { SEND: '🚀 SEND', TOPTEXT: '🎯 TOP TEXT', H1: 'Hook 1', ID: 'Clip ID', RAWFILE: 'Raw File', DECISION: '✅ YOUR DECISION', DECIDED_BY: 'Decided By', STATUS: 'Status', NOTES: 'Notes' };
 // Internal keys (stored at setup) -> folder names shown in Drive.
 const NAMES = {
   '00_Brand': '0 - Brand Kit (logos + watermarks)',
@@ -139,20 +139,17 @@ function onDecisionEdit(e) {
   }
   const c = cols_(sh);
   const c1 = e.range.getColumn(), c2 = e.range.getLastColumn();
-  if (c.TOPTEXT && c.TOPTEXT >= c1 && c.TOPTEXT <= c2 && c.DECISION) {
+  if (c.SEND && c.SEND >= c1 && c.SEND <= c2 && c.DECISION) {
     for (let r = Math.max(e.range.getRow(), HEADER_ROWS + 1); r <= e.range.getLastRow(); r++) {
-      const top = String(sh.getRange(r, c.TOPTEXT).getValue()).trim();
-      if (top.indexOf('✏️') === 0) {
-        SpreadsheetApp.getActive().toast('Click the cell and type your own top text (emojis ok), then press Enter.', '✏️ Your turn', 8);
-        continue;
-      }
-      if (top && String(sh.getRange(r, c.DECISION).getValue()).trim() === 'Approve') {
-        if (c.STATUS && String(sh.getRange(r, c.STATUS).getValue()) !== 'Ready to Post') {
-          sh.getRange(r, c.STATUS).setValue('Pending');
-        }
-        kickEdit_();
-        SpreadsheetApp.getActive().toast('Making the 6 versions now (3-5 min).', '🎬 Editing', 5);
-      }
+      const box = sh.getRange(r, c.SEND);
+      if (box.getValue() !== true) continue;
+      const approved = String(sh.getRange(r, c.DECISION).getValue()).trim() === 'Approve';
+      const top = c.TOPTEXT ? String(sh.getRange(r, c.TOPTEXT).getValue()).trim() : '';
+      if (!approved) { box.setValue(false); SpreadsheetApp.getActive().toast('Approve the clip first.', '🚀 Not yet', 5); continue; }
+      if (!top) { box.setValue(false); SpreadsheetApp.getActive().toast('Pick a hook or type your own in 🎯 TOP TEXT first (or pick "(no top text)").', '🚀 Not yet', 7); continue; }
+      if (c.STATUS && String(sh.getRange(r, c.STATUS).getValue()) !== 'Ready to Post') sh.getRange(r, c.STATUS).setValue('Pending');
+      kickEdit_();
+      SpreadsheetApp.getActive().toast('Making the 6 versions now (3-5 min).', '🎬 Sent', 5);
     }
   }
   if (!c.DECISION || c.DECISION < c1 || c.DECISION > c2) return;
@@ -254,11 +251,12 @@ function work_() {
   const st = sh.getRange(HEADER_ROWS + 1, c.STATUS, n, 1).getValues();
   const top = sh.getRange(HEADER_ROWS + 1, c.TOPTEXT, n, 1).getValues();
   const h1 = c.H1 ? sh.getRange(HEADER_ROWS + 1, c.H1, n, 1).getValues() : top;
+  const send = c.SEND ? sh.getRange(HEADER_ROWS + 1, c.SEND, n, 1).getValues() : top.map(() => [false]);
   d.forEach((v, i) => {
     if (v[0] !== 'Approve' || st[i][0] === 'Ready to Post') return;
     const t = String(top[i][0]).trim();
-    if (t && t.indexOf('✏️') !== 0) out.edit = true;
-    else if (!String(h1[i][0]).trim()) out.hooks = true;
+    if (t && send[i][0] === true) out.edit = true;
+    if (!t && !String(h1[i][0]).trim()) out.hooks = true;
   });
   return out;
 }
@@ -340,16 +338,14 @@ function processRow_(sh, r, c) {
       const cur = String(status.getValue());
       const later = cur === 'Ready to Post';
       if (!(later && decision === 'Approve')) {
-        const tt = c.TOPTEXT ? String(sh.getRange(r, c.TOPTEXT).getValue()).trim() : '';
-        const hasTop = tt && tt.indexOf('✏️') !== 0;
-        status.setValue(decision === 'Approve' && hasTop ? 'Pending' : rule.status);
+        status.setValue(rule.status);
+        if (decision !== 'Approve' && c.SEND) sh.getRange(r, c.SEND).setValue(false);
       }
     }
     if (decision === 'Approve') {
-      const top = c.TOPTEXT ? String(sh.getRange(r, c.TOPTEXT).getValue()).trim() : '';
-      if (top && top.indexOf('✏️') !== 0) kickEdit_();
-      else { kick_('hooks.yml', 'LAST_HOOK_KICK');
-             SpreadsheetApp.getActive().toast('Claude is writing 3 hooks (about 1 min). Then pick one in 🎯 TOP TEXT.', '✅ Approved', 6); }
+      const h1 = c.H1 ? String(sh.getRange(r, c.H1).getValue()).trim() : '';
+      if (!h1) kick_('hooks.yml', 'LAST_HOOK_KICK');
+      SpreadsheetApp.getActive().toast('Claude is writing 3 hooks (about 1 min). Pick one in 🎯 TOP TEXT (or type your own), then tick 🚀 SEND.', '✅ Approved', 8);
     }
   } catch (err) {
     if (c.NOTES) sh.getRange(r, c.NOTES).setValue('⚠ Move failed: ' + err.message);

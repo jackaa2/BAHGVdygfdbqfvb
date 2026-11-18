@@ -270,7 +270,11 @@ def main():
                                   "startColumnIndex": 6, "endColumnIndex": 7},
                         "rule": {"condition": {"type": "ONE_OF_LIST", "values": [
                             {"userEnteredValue": v} for v in ("Approve", "Reject")]},
-                            "showCustomUi": True, "strict": True}}}])
+                            "showCustomUi": True, "strict": True}}},
+                        {"setDataValidation": {
+                        "range": {"sheetId": gid, "startRowIndex": next_row - 1, "endRowIndex": next_row,
+                                  "startColumnIndex": 7, "endColumnIndex": 8},
+                        "rule": {"condition": {"type": "BOOLEAN"}}}}])
                 except Exception as e:
                     errors.append(f"{clip_id}: dropdown: {e}")
             except Exception as e:

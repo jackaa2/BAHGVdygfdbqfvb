@@ -26,7 +26,7 @@ if PREVIEWS:
     os.makedirs(PREVIEWS, exist_ok=True)
 NEEDED = {"id": "Clip ID", "decision": "✅ YOUR DECISION", "status": "Status", "raw": "Raw File",
           "edited": "Edited Files", "notes": "Notes", "h1": "Hook 1", "h2": "Hook 2", "h3": "Hook 3",
-          "streamer": "Streamer", "platform": "Platform", "title": "Clip Title", "top": "🎯 TOP TEXT"}
+          "streamer": "Streamer", "platform": "Platform", "title": "Clip Title", "top": "🎯 TOP TEXT", "send": "🚀 SEND"}
 
 
 def col_letter(i):  # 0-based -> A1 letter
@@ -162,7 +162,7 @@ def main():
     todo = []
     for i, r in enumerate(rows):
         if (cell(r, "id") and cell(r, "decision") == "Approve" and cell(r, "status") != "Ready to Post"
-                and cell(r, "top") and not cell(r, "top").startswith("✏️")):  # wait for a real hook
+                and cell(r, "top") and cell(r, "send").upper() == "TRUE"):  # only after 🚀 SEND is ticked
             tries = re.findall(r"Edit failed \(try (\d+)\)", cell(r, "notes"))
             if tries and int(tries[-1]) >= 3:
                 continue  # gave up after 3 tries; re-pick Approve after fixing to retry
