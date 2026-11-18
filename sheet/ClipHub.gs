@@ -182,14 +182,26 @@ function onDecisionEdit(e) {
   }
 }
 
-// ---- Rejected clips delete themselves 10 minutes after you reject them ----
-const REJECT_AFTER_MIN = 10;
+// ---- Rejected clips delete themselves 1 minute after you reject them ----
+const REJECT_AFTER_MIN = 1;
 function rejectTimes_() {
   try { return JSON.parse(PropertiesService.getScriptProperties().getProperty('REJECT_TIMES') || '{}'); } catch (e) { return {}; }
 }
 function stampReject_(id) {
   id = String(id || '').trim(); if (!id) return;
   const t = rejectTimes_(); if (!t[id]) { t[id] = Date.now(); PropertiesService.getScriptProperties().setProperty('REJECT_TIMES', JSON.stringify(t)); }
+  scheduleRejectSweep_(REJECT_AFTER_MIN * 60 * 1000 + 5000);
+}
+// a one-off timer that runs the sweep ~1 minute later (only one at a time)
+function scheduleRejectSweep_(ms) {
+  const exists = ScriptApp.getProjectTriggers().some(t => t.getHandlerFunction() === 'rejectSweep');
+  if (!exists) ScriptApp.newTrigger('rejectSweep').timeBased().after(ms).create();
+}
+function rejectSweep() {
+  ScriptApp.getProjectTriggers().filter(t => t.getHandlerFunction() === 'rejectSweep').forEach(t => ScriptApp.deleteTrigger(t));
+  autoDeleteRejected_();
+  // anything rejected in the meantime that isn't due yet: check again shortly
+  if (Object.keys(rejectTimes_()).length) scheduleRejectSweep_(30 * 1000);
 }
 function autoDeleteRejected_() {
   const sh = SpreadsheetApp.getActive().getSheetByName(PANEL);
@@ -206,8 +218,11 @@ function autoDeleteRejected_() {
       if (now - keep[id] >= REJECT_AFTER_MIN * 60 * 1000) due = true;
     }
   });
-  PropertiesService.getScriptProperties().setProperty('REJECT_TIMES', JSON.stringify(keep));
-  if (due) deleteRejected_(true, id => keep[id] && now - keep[id] >= REJECT_AFTER_MIN * 60 * 1000, true);
+  const isDue = id => keep[id] && now - keep[id] >= REJECT_AFTER_MIN * 60 * 1000;
+  const left = {};
+  Object.keys(keep).forEach(id => { if (!isDue(id)) left[id] = keep[id]; });
+  PropertiesService.getScriptProperties().setProperty('REJECT_TIMES', JSON.stringify(left));
+  if (due) deleteRejected_(true, isDue, true);
 }
 
 // ---- Delete all rejected clips (button = checkbox in Control Panel M2, or the menu) ----
