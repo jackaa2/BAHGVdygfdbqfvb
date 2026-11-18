@@ -172,3 +172,7 @@ CLIP_LOG_TAB = "🧾 Clip log"
 # 🧠 learning from results (📒 Posts views): starts once this many Shorts have been live 2+ days
 LEARN_MIN_POSTS = 20
 MAX_QUIET_HOURS = 6     # at most this many hours a day get skipped for flopping
+
+# two clips of the same streamer made within this many seconds = the same moment clipped twice -> keep only the
+# most-viewed one (stops the same funny moment going out on two channels)
+SAME_MOMENT_SECONDS = 120

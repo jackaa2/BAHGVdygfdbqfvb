@@ -304,6 +304,14 @@ def main():
         for cell in row:
             for u in re.findall(r'https?://(?:www\.|clips\.)?(?:twitch\.tv|kick\.com)[^"\s]*', str(cell)):
                 known.add(clip_key(u))
+    moments = []   # (streamer, when the clip was made): two clips of the same moment = a duplicate
+
+    def when(v):
+        try:
+            return dt.datetime.fromisoformat(str(v).strip().replace("Z", "+00:00"))
+        except ValueError:
+            return None
+
     # 🧾 Clip log: every clip ever grabbed (rows there are never cleaned up) -> never grab it again
     try:
         log = g.get_values(sheet, f"'{C.CLIP_LOG_TAB}'!A2:C") or []
@@ -317,6 +325,11 @@ def main():
             if seed:
                 g.append_rows(sheet, f"'{C.CLIP_LOG_TAB}'!A:E", seed)
                 log = seed
+        for row in g.get_values(sheet, f"'{C.CLIP_LOG_TAB}'!D2:G") or []:
+            if len(row) > 3 and row[3]:
+                t = when(row[3])
+                if t:
+                    moments.append((re.sub(r"[^a-z0-9]", "", str(row[0]).lower()), t))
         for row in log:
             if len(row) > 1 and row[1]:
                 known.add(str(row[1]).strip().lower())
@@ -419,6 +432,12 @@ def main():
             why["not English"] += 1; continue
         if NSFW_TITLE.search(c.get("title") or ""):
             why["nsfw title"] = why.get("nsfw title", 0) + 1; continue
+        made = when(c.get("created"))
+        if made and any(st == norm(c["streamer"]) and abs((made - t).total_seconds()) < C.SAME_MOMENT_SECONDS
+                        for st, t in moments):
+            why["same moment"] = why.get("same moment", 0) + 1; continue   # another clipper's copy
+        if made:
+            moments.append((norm(c["streamer"]), made))
         seen.add(clip_key(c["url"])); picks.append(c)
         if len(picks) >= max_new:
             break
@@ -477,9 +496,10 @@ def main():
                 g.update_values(sheet, f"'{C.PANEL_TAB}'!A{next_row}", [row])
                 grabbed += 1
                 try:
-                    g.append_rows(sheet, f"'{C.CLIP_LOG_TAB}'!A:E", [[clip_id, clip_key(c["url"]), c["url"],
+                    g.append_rows(sheet, f"'{C.CLIP_LOG_TAB}'!A:G", [[clip_id, clip_key(c["url"]), c["url"],
                                                                      safe(c["streamer"]),
-                                                                     now_et.strftime("%Y-%m-%d %H:%M")]])
+                                                                     now_et.strftime("%Y-%m-%d %H:%M"), "",
+                                                                     "'" + str(c.get("created") or "")]])
                 except Exception as e:
                     print(f"clip log: {e}")
                 try:  # Approve/Reject dropdown only on rows that have a clip
