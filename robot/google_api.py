@@ -70,9 +70,14 @@ class Google:
         return next(x["properties"]["sheetId"] for x in meta["sheets"] if x["properties"]["title"] == title)
 
     def append_rows(self, sheet_id, rng, rows):
-        self._req("POST", f"{SHEETS}/{sheet_id}/values/{requests.utils.quote(rng)}:append",
-                  params={"valueInputOption": "USER_ENTERED", "insertDataOption": "INSERT_ROWS"},
-                  json={"values": rows})
+        """Returns the A1 range the rows landed in (e.g. "'Tab'!A12:L16")."""
+        r = self._req("POST", f"{SHEETS}/{sheet_id}/values/{requests.utils.quote(rng)}:append",
+                      params={"valueInputOption": "USER_ENTERED", "insertDataOption": "INSERT_ROWS"},
+                      json={"values": rows})
+        try:
+            return r.json().get("updates", {}).get("updatedRange", "")
+        except ValueError:
+            return ""
 
     def ensure_rows(self, sheet_id, tab, min_rows):
         """Grow the tab (copying the formatting of the rows above) so writes never hit the grid edge."""

@@ -111,10 +111,15 @@ AUTO_PICKS_PER_WINDOW = 10
 AUTO_WINDOW_HOURS = 6
 
 # 📅 Posting to YouTube through Upload-Post (off until you have the account + API key)
-POSTING_ENABLED = False
-UPLOAD_POST_USERS = {1: "", 2: "", 3: "", 4: "", 5: ""}   # Upload-Post profile name for each channel
+POSTING_ENABLED = True       # safe: nothing posts until someone ticks POST IT on the Review tab
+UPLOAD_POST_USERS = {1: "ch1-leonida", 2: "ch2-vicecity", 3: "ch3-highlights", 4: "ch4-gta6tv", 5: "ch5-streamersgta6"}   # Upload-Post profile name for each channel
 POST_EVERY_HOURS = 3          # one Short every 3 hours on each channel
 POST_PRIVACY = "public"       # "public" = goes live at its scheduled time; "unlisted" / "private" also work
 POST_MODE = "split"           # "split": each clip goes to ONE channel (clips take turns)
                               # "all":   each clip goes to ALL 5 channels, each with its own hook
 POST_HASHTAGS = "#GTA6 #GTAVI #GTA #shorts"
+
+POSTS_TAB = "📒 Posts"          # permanent log of every Short we booked (+ its YouTube stats)
+ANALYTICS_TAB = "📊 Analytics"  # channel stats, top streamers, top Shorts, 30-day chart
+ANALYTICS_EVERY_HOURS = 2
+REVIEW_TAB = "🎬 Review"        # every finished video waits here until someone ticks POST IT

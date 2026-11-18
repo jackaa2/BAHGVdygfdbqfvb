@@ -223,7 +223,8 @@ def main():
 
                 # YouTube channels 1-5 (each with its own hook so no two channels post the same video)
                 from render import WM_DIR
-                jobs = [(a, f"A{a}", C.ACCOUNT_FOLDERS[a], f"{clip_id}_A{a}.mp4") for a in sorted(C.CHANNELS)]
+                targets = assign_channels()
+                jobs = [(a, f"A{a}", C.ACCOUNT_FOLDERS[a], f"{clip_id}_A{a}.mp4") for a in targets]
                 if getattr(C, "MAKE_TIKTOK", False):
                     jobs += [(t, f"T{t}", C.TIKTOK_FOLDERS[t], f"{clip_id}_TT{t}.mp4") for t in sorted(C.TIKTOK_FOLDERS)
                              if os.path.exists(os.path.join(WM_DIR, f"T{t}.png"))]
@@ -243,14 +244,24 @@ def main():
                                         "-vf", "scale=360:640", os.path.join(PREVIEWS, name.replace(".mp4", ".jpg"))])
                     return folder, name, out
 
+                review = []
                 with ThreadPoolExecutor(max_workers=min(4, os.cpu_count() or 2)) as pool:
                     for folder, name, out in pool.map(one, jobs):
                         old = g.find_child(folder, name, folder=False)
                         if old:
                             g.trash(old)  # re-edit replaces the older version (old one goes to Drive trash)
-                        g.upload(out, name, folder)
+                        vid = g.upload(out, name, folder)
                         os.remove(out)
                         made += 1
+                        m = re.search(r"_A(\d)\.mp4$", name)
+                        if m:
+                            a = int(m.group(1))
+                            review.append([clip_id, a, C.CHANNELS[a], per_channel.get(a, cell(r, "top")),
+                                           f'=HYPERLINK("https://drive.google.com/file/d/{vid}/view","▶ watch")',
+                                           cell(r, "streamer"), False, False, False, "👀 Watch it, then tick POST IT",
+                                           "", vid])
+                if review:
+                    add_review_rows(g, sheet, review)
                 if PREVIEWS and os.environ.get("PREVIEW_UPLOAD") == "yes":
                     try:
                         sheet_img = os.path.join(PREVIEWS, f"{clip_id}_preview.jpg")
@@ -290,6 +301,36 @@ def describe(path):
                         "stream=index,codec_type,codec_name,width,height,r_frame_rate,avg_frame_rate,start_time,duration,nb_frames,time_base:format=start_time,duration,size",
                         "-of", "compact=p=0:nk=0", path], capture_output=True, text=True)
     return " || ".join(r.stdout.split("\n")).strip()
+
+
+_turn = {"n": None}
+
+
+def assign_channels():
+    """Which channel(s) get this clip. "split": one channel each, taking turns; "all": every channel."""
+    if C.POST_MODE == "all":
+        return sorted(C.CHANNELS)
+    chans = sorted(C.CHANNELS)
+    if _turn["n"] is None:   # continue the rotation from everything booked / waiting so far
+        g, sheet = Google(), os.environ["SHEET_ID"]
+        done = len(g.get_values(sheet, f"'{C.POSTS_TAB}'!A2:A") or [])
+        waiting = len(g.get_values(sheet, f"'{C.REVIEW_TAB}'!A2:A") or [])
+        _turn["n"] = done + waiting
+    a = chans[_turn["n"] % len(chans)]
+    _turn["n"] += 1
+    return [a]
+
+
+def add_review_rows(g, sheet, rows):
+    """Finished videos go to the Review tab; nothing posts until someone ticks POST IT there."""
+    where = g.append_rows(sheet, f"'{C.REVIEW_TAB}'!A:L", rows)
+    m = re.search(r"![A-Z]+(\d+):[A-Z]+(\d+)", where or "")
+    if m:   # checkboxes only on the new rows
+        gid = g.sheet_gid(sheet, C.REVIEW_TAB)
+        g.batch_update(sheet, [{"setDataValidation": {
+            "range": {"sheetId": gid, "startRowIndex": int(m.group(1)) - 1, "endRowIndex": int(m.group(2)),
+                      "startColumnIndex": 6, "endColumnIndex": 9},
+            "rule": {"condition": {"type": "BOOLEAN"}}}}])
 
 
 def make_sample(g, sheet, rows, cell, clip_id):

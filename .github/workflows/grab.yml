@@ -13,6 +13,10 @@ on:
         description: "DANGER: delete ALL robot clip videos in the clip folders (type yes)"
         required: false
         default: ""
+      check_posting:
+        description: "Only check the Upload-Post key + profiles (type yes)"
+        required: false
+        default: ""
       fix_raw:
         description: "Re-wrap raw clips already in the sheet so Drive/trimmer can play them (type yes)"
         required: false
@@ -59,8 +63,15 @@ jobs:
             || (timeout 100 sudo apt-get update -qq; timeout 120 sudo apt-get install -y -qq ffmpeg)
           fi
           ffmpeg -version | head -1
+      - name: Check Upload-Post connection
+        if: inputs.check_posting == 'yes'
+        working-directory: robot
+        env:
+          UPLOAD_POST_KEY: ${{ secrets.UPLOAD_POST_KEY }}
+        run: python -u upload_post_check.py
       - name: Grab clips
         id: grab
+        if: inputs.check_posting != 'yes'
         working-directory: robot
         env:
           TWITCH_CLIENT_ID: ${{ secrets.TWITCH_CLIENT_ID }}
@@ -81,3 +92,25 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh workflow run hooks.yml -R ${{ github.repository }}
+      - name: YouTube stats into the sheet (every ~2h; skipped until posting is set up)
+        if: always()
+        continue-on-error: true
+        working-directory: robot
+        env:
+          UPLOAD_POST_KEY: ${{ secrets.UPLOAD_POST_KEY }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
+          SHEET_ID: ${{ secrets.SHEET_ID }}
+        run: python -u analytics.py
+      - name: Post the videos you approved on the Review tab (and do redos)
+        if: always() && inputs.check_posting != 'yes'
+        continue-on-error: true
+        working-directory: robot
+        env:
+          UPLOAD_POST_KEY: ${{ secrets.UPLOAD_POST_KEY }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
+          SHEET_ID: ${{ secrets.SHEET_ID }}
+        run: python -u poster.py
