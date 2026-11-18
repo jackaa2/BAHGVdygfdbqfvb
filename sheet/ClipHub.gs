@@ -144,7 +144,7 @@ function onDecisionEdit(e) {
 }
 
 // ---- Delete all rejected clips (button = checkbox in Control Panel M2, or the menu) ----
-const DELETE_BOX = 'M2';
+const DELETE_BOX = 'P2';
 const DELETED_TAB = 'Deleted Clips'; // hidden list so the robot never grabs a deleted clip again
 
 function deleteRejected() {

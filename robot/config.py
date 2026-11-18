@@ -55,9 +55,9 @@ CLEANUP_DAYS = {
     "rejected": 1,      # videos in "6 - Rejected" (the 🗑 button removes them right away)
     "new": 3,           # never-decided clips in "1 - New Clips"
     "hold": 7,          # "2 - On Hold" (a week)
-    "approved": 3,      # leftover raws in "3 - Approved" (normally deleted right after editing)
+    "approved": 1,      # raw clips in "3 - Approved": kept 1 day after their 6 versions were made
     "ready": 3,         # finished versions in "4 - Ready to Post/Account N"
 }
-DELETE_RAW_AFTER_EDIT = True  # approved raw clip is deleted once all 6 versions are in the account folders
+DELETE_RAW_AFTER_EDIT = False # raw is kept 1 day after editing (see CLEANUP_DAYS['approved'])
 STREAMER_ONLY_CAPTIONS = True  # skip game dialogue / donation voices / background chatter
 MAX_CLIP_SECONDS = 25.0       # every version is cut to at most 25 s (the stretch with the most talking)

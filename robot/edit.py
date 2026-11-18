@@ -212,6 +212,10 @@ def main():
                 put(rownum, "edited", '=HYPERLINK("https://drive.google.com/drive/folders/'
                     f'{C.FOLDERS["ready"][0]}","✅ 6 versions")', clip_id)
                 put(rownum, "status", "Ready to Post", clip_id)
+                try:
+                    g.touch(fid)  # raw is kept 1 more day from now, then the clean-up deletes it
+                except Exception as e:
+                    print(f"{clip_id}: could not mark raw: {e}")
                 if C.DELETE_RAW_AFTER_EDIT and made == 6:
                     try:
                         g.delete(fid)  # all 6 versions are safely in the account folders

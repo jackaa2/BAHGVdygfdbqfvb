@@ -133,6 +133,12 @@ class Google:
                 f.write(chunk)
         return path
 
+    def touch(self, file_id):
+        """Mark a file as 'just used' so the clean-up clock starts now."""
+        import datetime as _dt
+        now = _dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+        self._req("PATCH", f"{DRIVE}/files/{file_id}", json={"modifiedTime": now})
+
     def trash(self, file_id):
         self._req("PATCH", f"{DRIVE}/files/{file_id}", json={"trashed": True})
 

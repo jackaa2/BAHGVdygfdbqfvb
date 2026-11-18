@@ -227,7 +227,7 @@ def main():
         pct = u / l if l else 0
         color = "#e53935" if pct > 0.85 else "#fb8c00" if pct > 0.6 else "#43a047"
         g.update_values(sheet, f"'{C.PANEL_TAB}'!K1:L1", [[
-            f"{u:.1f} of {l:.0f} GB ({pct:.0%})" if l else f"{u:.1f} GB used",
+            f"💾 Drive: {u:.1f} of {l:.0f} GB ({pct:.0%})" if l else f"💾 Drive: {u:.1f} GB used",
             f'=SPARKLINE({pct:.4f},{{"charttype","bar";"max",1;"color1","{color}"}})']])
         if pct > 0.85:
             errors.insert(0, f"DRIVE {pct:.0%} FULL")
