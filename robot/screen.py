@@ -84,7 +84,18 @@ def ask_claude(key, prompt, imgs):
         if r.status_code == 200:
             text = "".join(b.get("text", "") for b in r.json().get("content", []))
             m = re.search(r"\{.*\}", text, re.S)
-            return json.loads(m.group(0))
+            if m:
+                try:
+                    return json.loads(m.group(0))
+                except json.JSONDecodeError:
+                    pass
+            # no JSON: pull hook-looking lines out of the text instead
+            lines = [re.sub(r'^[\s\-\*\d\.\)"]+|"$', "", l).strip() for l in text.splitlines()]
+            lines = [l for l in lines if 6 <= len(l) <= 60 and not l.lower().startswith(("here", "hook", "{", "}"))]
+            if len(lines) >= 2:
+                return {"hooks": lines[:3]}
+            last = f"{model}: no hooks in reply: {text[:200]!r}"
+            continue
         last = f"{model}: {r.status_code} {r.text[:200]}"
         if r.status_code in (401, 403):
             break  # bad key: no point trying another model
