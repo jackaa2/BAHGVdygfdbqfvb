@@ -96,6 +96,25 @@ def main():
     H = {"Authorization": f"Apikey {key}"}
     problems = []
 
+    # ---- are all 5 channels still connected? (YouTube logins can expire) -> sheet status -> text alert ----
+    try:
+        r = requests.get(f"{BASE}/uploadposts/users", headers=H, timeout=60)
+        if r.status_code in (401, 403):
+            g.update_values(sheet, f"'{C.PANEL_TAB}'!G1", [["🤖 Robot · ❌ FAILED: Upload-Post key rejected - check the UPLOAD_POST_KEY secret"]])
+        elif r.ok:
+            profiles = {p.get("username"): p for p in (r.json().get("profiles") or []) if isinstance(p, dict)}
+            broken = []
+            for a, user in C.UPLOAD_POST_USERS.items():
+                yt = (profiles.get(user) or {}).get("social_accounts", {}).get("youtube")
+                if not isinstance(yt, dict) or yt.get("reauth_required"):
+                    broken.append(f"ch{a}")
+            if broken:
+                g.update_values(sheet, f"'{C.PANEL_TAB}'!G1", [[
+                    f"🤖 Robot · ❌ FAILED: YouTube {', '.join(broken)} needs reconnecting in Upload-Post"]])
+                problems.append("reconnect " + ", ".join(broken))
+    except (requests.RequestException, ValueError) as e:
+        problems.append(f"profile check: {e}")
+
     # ---- channel totals + daily views ----
     rows, daily = [], {}
     for a in sorted(C.CHANNELS):
