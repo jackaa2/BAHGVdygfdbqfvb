@@ -202,7 +202,8 @@ def handle_bad(g, sheet, review, now):
             if clip_id in by_id and cell(by_id[clip_id], "✅ YOUR DECISION") != "Reject":
                 set_panel(g, sheet, head, rows, clip_id, {"✅ YOUR DECISION": "Reject",
                                                           "Notes": f"🤖 swapped out: {reason}"})
-            cand = replacement(g, sheet, head, rows, cell, now, exclude={clip_id} | taken)
+            cand = replacement(g, sheet, head, rows, cell, now, exclude={clip_id} | taken,
+                               not_streamer=str(r[R_STREAMER]).strip().lower() if reason == "Duplicate clip" else "")
             if not cand:
                 g.update_values(sheet, f"'{C.REVIEW_TAB}'!{L(R_STATUS)}{rn}",
                                 [["⚠️ No new clip to swap in yet - will retry every 30 min"]])
@@ -221,7 +222,7 @@ def handle_bad(g, sheet, review, now):
     return changed
 
 
-def replacement(g, sheet, head, rows, cell, now, exclude=()):
+def replacement(g, sheet, head, rows, cell, now, exclude=(), not_streamer=""):
     """Best new clip from the last 24 h nobody has decided on yet (most views first)."""
     import re as _re
     nsfw = _re.compile(r"(?i)(🔞|18\+|nud|naked|strip|lap ?dance|boob|flash|goon|horny|gya+t)")
@@ -229,7 +230,8 @@ def replacement(g, sheet, head, rows, cell, now, exclude=()):
     for r in rows:
         cid = cell(r, "Clip ID")
         if (not cid or cid in exclude or cell(r, "Status") != "New" or cell(r, "✅ YOUR DECISION")
-                or cell(r, "Notes") or nsfw.search(cell(r, "Clip Title"))):
+                or cell(r, "Notes") or nsfw.search(cell(r, "Clip Title"))
+                or (not_streamer and cell(r, "Streamer").lower() == not_streamer)):
             continue
         try:
             v = float(cell(r, "Views").replace(",", "") or 0)
