@@ -5,6 +5,10 @@ on:
     - cron: "3,13,23,33,43,53 * * * *"   # every 10 min
   workflow_dispatch:
     inputs:
+      sample_id:
+        description: "TEST: make one sample video (with the bell) of this clip ID; changes nothing else"
+        required: false
+        default: ""
       preview:
         description: "TEST: also upload a preview image of the 6 versions to Drive (_previews)"
         required: false
@@ -55,7 +59,17 @@ jobs:
           SHEET_ID: ${{ secrets.SHEET_ID }}
           PREVIEW_DIR: ${{ github.workspace }}/previews
           PREVIEW_UPLOAD: ${{ inputs.preview }}
+          SAMPLE_ID: ${{ inputs.sample_id }}
+          SAMPLE_DIR: ${{ github.workspace }}/sample
         run: python edit.py
+      - name: Save sample video
+        if: always() && inputs.sample_id != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: sample
+          path: sample/
+          retention-days: 3
+          if-no-files-found: ignore
       - name: Save preview frames (for checking the look)
         if: always()
         uses: actions/upload-artifact@v4

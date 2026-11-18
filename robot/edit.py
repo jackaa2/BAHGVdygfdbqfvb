@@ -174,6 +174,10 @@ def main():
             rownum = hits[0]
         g.update_values(sheet, f"'{C.PANEL_TAB}'!{col_letter(col[k])}{rownum}", [[value]])
 
+    sample = (os.environ.get("SAMPLE_ID") or "").strip()
+    if sample:
+        return make_sample(g, sheet, rows, cell, sample)
+
     todo = []
     for i, r in enumerate(rows):
         if (cell(r, "id") and cell(r, "decision") == "Approve" and cell(r, "status") != "Ready to Post"
@@ -229,7 +233,7 @@ def main():
                            hook_font, st_["handle"] if C.SHOW_WATERMARK else "", st_["spot"], st_["zoom"],
                            window if manual else min(window + st_["trim"], max(dur - 3, 0)), tmp,
                            platform=cell(r, "platform") or "Twitch", streamer=cell(r, "streamer"),
-                           max_len=clip_len, wm_name=wm_name)
+                           max_len=clip_len, wm_name=wm_name, bell=C.BELL_SFX)
                     if PREVIEWS:
                         subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", "3", "-i", out, "-frames:v", "1",
                                         "-vf", "scale=360:640", os.path.join(PREVIEWS, name.replace(".mp4", ".jpg"))])
@@ -274,6 +278,31 @@ def main():
                 n = int(tries[-1]) + 1 if tries else 1
                 put(rownum, "status", "Pending", clip_id)
                 put(rownum, "notes", clip_id=clip_id, value=f"⚠ Edit failed (try {n}) {dt.datetime.now(ET):%a %I:%M %p}: {msg[:250]}")
+
+
+def make_sample(g, sheet, rows, cell, clip_id):
+    """TEST: one YouTube channel-1 version of a clip, with the bell, saved as a GitHub artifact.
+    Touches nothing in the sheet or the channel folders."""
+    r = next((r for r in rows if cell(r, "id") == clip_id), None)
+    if not r:
+        raise RuntimeError(f"sample: clip {clip_id} not in the sheet")
+    out_dir = os.environ.get("SAMPLE_DIR") or "."
+    os.makedirs(out_dir, exist_ok=True)
+    with tempfile.TemporaryDirectory() as tmp:
+        src = g.download(file_id(cell(r, "raw")), os.path.join(tmp, "raw.mp4"))
+        words = transcribe(src)
+        from render import probe
+        dur = probe(src)[2]
+        top = cell(r, "top")
+        if not top or top.startswith("⚠️ Claude"):
+            top = cell(r, "h1") or "Sample hook 🔔"
+        hook_font = brand_font(g, tmp)
+        st_ = account_settings(g, sheet)[1]
+        out = os.path.join(out_dir, f"SAMPLE_{clip_id}_bell.mp4")
+        render(src, out, 1, words, static_caption(top, ""), "#FFFFFF", hook_font, "", st_["spot"], st_["zoom"],
+               best_window(words, dur, C.MAX_CLIP_SECONDS), tmp, platform=cell(r, "platform") or "Twitch",
+               streamer=cell(r, "streamer"), max_len=C.MAX_CLIP_SECONDS, wm_name="A1", bell=True)
+        print(f"sample made: {out}")
 
 
 REQUIRED = ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_REFRESH_TOKEN", "SHEET_ID"]

@@ -94,3 +94,6 @@ TIKTOK_FOLDERS = {
 
 # written in 🎯 TOP TEXT when Claude can't come up with hooks (never used as the video's top text)
 NO_HOOK_TEXT = "⚠️ Claude couldn't write a hook - type your own here"
+
+# 🔔 bell sound at the very start of every version (test it first: Actions > Make channel versions > sample_id)
+BELL_SFX = False

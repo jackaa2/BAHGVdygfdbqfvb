@@ -197,8 +197,26 @@ def watermark_png(acct, workdir, wm_name=None):
     return out, im.size
 
 
+def bell_wav(workdir):
+    """A short bright 'ding' made with ffmpeg (no sound file needed)."""
+    path = os.path.join(workdir, "bell.wav")
+    if not os.path.exists(path):
+        expr = ("0.55*sin(2*PI*1318.5*t)*exp(-3.5*t)+0.30*sin(2*PI*2637*t)*exp(-5*t)"
+                "+0.18*sin(2*PI*3640*t)*exp(-7*t)+0.08*sin(2*PI*5274*t)*exp(-10*t)")
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i",
+                        f"aevalsrc='{expr}':s=44100:d=1.6", "-af", "afade=t=in:d=0.004", path],
+                       check=True, capture_output=True, text=True)
+    return path
+
+
+def has_audio(src):
+    r = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "a", "-show_entries", "stream=index",
+                        "-of", "csv=p=0", src], capture_output=True, text=True)
+    return bool(r.stdout.strip())
+
+
 def render(src, out, acct, words, hook, hook_color, hook_font, handle, spot, zoom, trim, workdir,
-           platform="twitch", streamer="", max_len=25.0, wm_name=None):
+           platform="twitch", streamer="", max_len=25.0, wm_name=None, bell=False):
     src_w, src_h, dur = probe(src)
     pic = PICTURE[acct]
     fg_w, fg_h, top, bottom = video_box(src_w, src_h, zoom, pic["y_shift"])
@@ -240,9 +258,18 @@ def render(src, out, acct, words, hook, hook_color, hook_font, handle, spot, zoo
         vf += f";[{last}][{i + 1}:v]overlay={ox}:{oy}[s{i + 1}]"
         last = f"s{i + 1}"
     vf += f";[{last}]null[v]"
+    audio_map, bell_in = "0:a?", []
+    if bell:
+        bi = len(extra_inputs) + 1
+        bell_in = ["-i", bell_wav(workdir)]
+        if has_audio(src):
+            vf += f";[{bi}:a]volume=0.55[bl];[0:a][bl]amix=inputs=2:duration=first:normalize=0[aout]"
+        else:
+            vf += f";[{bi}:a]apad[aout]"
+        audio_map = "[aout]"
     cmd = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-ss", f"{trim:.2f}", "-t", f"{length:.2f}",
-           "-i", src] + sum([["-loop", "1", "-i", x] for x in extra_inputs], []) + [
-           "-filter_complex", vf, "-t", f"{length:.2f}", "-map", "[v]", "-map", "0:a?",
+           "-i", src] + sum([["-loop", "1", "-i", x] for x in extra_inputs], []) + bell_in + [
+           "-filter_complex", vf, "-t", f"{length:.2f}", "-map", "[v]", "-map", audio_map,
            "-c:v", "libx264", "-preset", "superfast", "-crf", "23", "-maxrate", "4M", "-bufsize", "8M", "-pix_fmt", "yuv420p", "-r", "30",
            "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-map_metadata", "-1",
            "-movflags", "+faststart", out]
