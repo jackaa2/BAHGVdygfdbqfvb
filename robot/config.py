@@ -9,9 +9,9 @@ HEADER_ROWS = 3
 
 # What counts as worth grabbing
 GAME_NAMES = ["Grand Theft Auto VI"]   # Twitch category to pull top clips from
-LOOKBACK_HOURS = 6                      # only clips made in the last N hours
+LOOKBACK_HOURS = 12                     # only clips made in the last N hours
 MIN_VIEWS_CATEGORY = 300               # GTA 6 category clips (any streamer)
-MIN_VIEWS_TRACKED = 100                # clips from streamers on our list
+MIN_VIEWS_TRACKED = 25                # clips from streamers on our list
 MIN_SECONDS, MAX_SECONDS = 6, 60
 PREFERRED_SECONDS = 60         # no length preference: any clip up to 1 min ranks on views alone
 LANGUAGES = {"en"}                      # skip non-English clips
