@@ -257,7 +257,7 @@ def main():
                 hooks = [h for h in hooks if h]
                 auto = cell(r, "notes").startswith(AUTO_TAG)
                 postable = res.get("postable", True) is not False
-                if not hooks:
+                if not hooks and postable:
                     raise RuntimeError("Claude returned no hooks")
                 # find the row again right before writing (rows can move)
                 ids = g.get_values(sheet, f"'{C.PANEL_TAB}'!A{C.HEADER_ROWS + 1}:A")
