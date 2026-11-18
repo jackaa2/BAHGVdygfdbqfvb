@@ -283,7 +283,10 @@ def main():
                         {"setDataValidation": {
                         "range": {"sheetId": gid, "startRowIndex": next_row - 1, "endRowIndex": next_row,
                                   "startColumnIndex": hcol("🚀 SEND"), "endColumnIndex": hcol("🚀 SEND") + 1},
-                        "rule": {"condition": {"type": "BOOLEAN"}}}}])
+                        "rule": {"condition": {"type": "BOOLEAN"}}}}] + ([{"setDataValidation": {
+                        "range": {"sheetId": gid, "startRowIndex": next_row - 1, "endRowIndex": next_row,
+                                  "startColumnIndex": hcol("✂️ TRIM"), "endColumnIndex": hcol("✂️ TRIM") + 1},
+                        "rule": {"condition": {"type": "BOOLEAN"}}}}] if "✂️ TRIM" in header else []))
                 except Exception as e:
                     errors.append(f"{clip_id}: dropdown: {e}")
             except Exception as e:

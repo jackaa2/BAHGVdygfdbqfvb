@@ -20,7 +20,7 @@ const PANEL = 'Control Panel';
 const STYLES = 'Account Styles';
 const HEADER_ROWS = 3;
 // Columns are found by their header text in row 3, so moving columns never breaks this.
-const HEAD = { START: '✂️ START', END: '✂️ END', SEND: '🚀 SEND', TOPTEXT: '🎯 TOP TEXT', H1: 'Hook 1', ID: 'Clip ID', RAWFILE: 'Raw File', DECISION: '✅ YOUR DECISION', DECIDED_BY: 'Decided By', STATUS: 'Status', NOTES: 'Notes' };
+const HEAD = { TRIM: '✂️ TRIM', CUT: '✂️ CUT', LENGTH: 'Length (s)', SEND: '🚀 SEND', TOPTEXT: '🎯 TOP TEXT', H1: 'Hook 1', ID: 'Clip ID', RAWFILE: 'Raw File', DECISION: '✅ YOUR DECISION', DECIDED_BY: 'Decided By', STATUS: 'Status', NOTES: 'Notes' };
 // Internal keys (stored at setup) -> folder names shown in Drive.
 const NAMES = {
   '00_Brand': '0 - Brand Kit (logos + watermarks)',
@@ -58,6 +58,8 @@ function onOpen() {
     .addSeparator()
     .addItem('⏱ Connect robot timer (GitHub key)…', 'connectRobot')
     .addItem('▶ Run grabber now', 'runGrabberNow')
+    .addSeparator()
+    .addItem('✂️ Trim selected clip', 'trimSelected')
     .addToUi();
 }
 
@@ -139,6 +141,15 @@ function onDecisionEdit(e) {
   }
   const c = cols_(sh);
   const c1 = e.range.getColumn(), c2 = e.range.getLastColumn();
+  if (c.TRIM && c.TRIM >= c1 && c.TRIM <= c2 && e.range.getNumRows() === 1) {
+    const r = e.range.getRow();
+    if (r > HEADER_ROWS && sh.getRange(r, c.TRIM).getValue() === true) {
+      sh.getRange(r, c.TRIM).setValue(false);
+      try { openTrimmer_(r); }
+      catch (err) { SpreadsheetApp.getActive().toast('Click any cell in this row, then 🎬 Clip Hub > ✂️ Trim selected clip.', '✂️ Trim', 8); }
+    }
+    return;
+  }
   if (c.SEND && c.SEND >= c1 && c.SEND <= c2 && c.DECISION) {
     for (let r = Math.max(e.range.getRow(), HEADER_ROWS + 1); r <= e.range.getLastRow(); r++) {
       const box = sh.getRange(r, c.SEND);
@@ -147,11 +158,8 @@ function onDecisionEdit(e) {
       const top = c.TOPTEXT ? String(sh.getRange(r, c.TOPTEXT).getValue()).trim() : '';
       if (!approved) { box.setValue(false); SpreadsheetApp.getActive().toast('Approve the clip first.', '🚀 Not yet', 5); continue; }
       if (!top) { box.setValue(false); SpreadsheetApp.getActive().toast('Pick a hook or type your own in 🎯 TOP TEXT first (or pick "(no top text)").', '🚀 Not yet', 7); continue; }
-      const a = c.START ? secs_(sh.getRange(r, c.START).getDisplayValue()) : null;
-      const b = c.END ? secs_(sh.getRange(r, c.END).getDisplayValue()) : null;
-      if (a === -1 || b === -1) { box.setValue(false); SpreadsheetApp.getActive().toast('✂️ START/END must look like 0:05 or 5.', '🚀 Not yet', 6); continue; }
-      if (a !== null && b !== null && b <= a) { box.setValue(false); SpreadsheetApp.getActive().toast('✂️ END must be after START.', '🚀 Not yet', 6); continue; }
-      if (a !== null && b !== null && b - a > 60) { box.setValue(false); SpreadsheetApp.getActive().toast('Max 1 minute between START and END.', '🚀 Not yet', 6); continue; }
+      const cut = c.CUT ? parseCut_(sh.getRange(r, c.CUT).getDisplayValue()) : null;
+      if (cut === -1) { box.setValue(false); SpreadsheetApp.getActive().toast('✂️ CUT must look like 0:05-0:32 (or leave it blank).', '🚀 Not yet', 6); continue; }
       if (c.STATUS && String(sh.getRange(r, c.STATUS).getValue()) !== 'Ready to Post') sh.getRange(r, c.STATUS).setValue('Pending');
       kickEdit_();
       SpreadsheetApp.getActive().toast('Making the 6 versions now (3-5 min).', '🎬 Sent', 5);
@@ -317,6 +325,89 @@ function resyncAll() {
     if (sh.getRange(r, c.ID).getValue()) processRow_(sh, r, c);
   }
 }
+
+// ---- Trim slider ----
+function trimSelected() {
+  const sh = SpreadsheetApp.getActive().getSheetByName(PANEL);
+  const r = sh.getActiveRange() ? sh.getActiveRange().getRow() : 0;
+  if (r <= HEADER_ROWS || !sh.getRange(r, 1).getValue()) { SpreadsheetApp.getUi().alert('Click a cell in a clip row first.'); return; }
+  openTrimmer_(r);
+}
+
+function openTrimmer_(r) {
+  const sh = SpreadsheetApp.getActive().getSheetByName(PANEL);
+  const c = cols_(sh);
+  const id = String(sh.getRange(r, c.ID).getValue());
+  const fileId = c.RAWFILE ? extractId_(sh.getRange(r, c.RAWFILE)) : '';
+  if (!fileId) throw new Error('no video');
+  const len = Number(c.LENGTH ? sh.getRange(r, c.LENGTH).getValue() : 0) || 60;
+  const cut = c.CUT ? parseCut_(sh.getRange(r, c.CUT).getDisplayValue()) : null;
+  const t = HtmlService.createTemplate(TRIM_HTML);
+  t.row = r; t.id = id; t.fileId = fileId; t.len = Math.min(len, 600);
+  t.a = cut && cut !== -1 ? cut[0] : 0;
+  t.b = cut && cut !== -1 ? cut[1] : Math.min(len, 60);
+  SpreadsheetApp.getUi().showModelessDialog(t.evaluate().setWidth(560).setHeight(520), '✂️ Trim ' + id);
+}
+
+function saveTrim(row, a, b) {
+  const sh = SpreadsheetApp.getActive().getSheetByName(PANEL);
+  const c = cols_(sh);
+  const full = a <= 0.05 && b >= Number(sh.getRange(row, c.LENGTH).getValue() || 0) - 0.05;
+  sh.getRange(row, c.CUT).setValue(full ? '' : "'" + mmss_(a) + '-' + mmss_(b));
+  return full ? 'Full clip' : mmss_(a) + '-' + mmss_(b);
+}
+
+function mmss_(x) {
+  const m = Math.floor(x / 60), s = Math.round((x - m * 60) * 10) / 10;
+  return m + ':' + (s < 10 ? '0' : '') + s;
+}
+
+// '0:05-0:32' -> [5, 32]; '' -> null; junk -> -1
+function parseCut_(v) {
+  const t = String(v || '').trim().replace(/^'/, '');
+  if (!t) return null;
+  const p = t.split(/\s*[-–]\s*/);
+  if (p.length !== 2) return -1;
+  const a = secs_(p[0]), b = secs_(p[1]);
+  if (a === null || b === null || a < 0 || b < 0 || b <= a || b - a > 60) return -1;
+  return [a, b];
+}
+
+const TRIM_HTML = `
+<style>
+ body{font-family:Arial,sans-serif;margin:10px;background:#111;color:#eee}
+ iframe{width:100%;height:290px;border:0;border-radius:8px;background:#000}
+ .wrap{position:relative;height:36px;margin:18px 4px 6px}
+ .wrap input{position:absolute;left:0;width:100%;pointer-events:none;-webkit-appearance:none;background:none;top:8px}
+ .wrap input::-webkit-slider-thumb{pointer-events:all;-webkit-appearance:none;width:20px;height:28px;border-radius:5px;background:#ff8a2b;cursor:pointer;border:2px solid #fff}
+ .track{position:absolute;top:18px;height:8px;width:100%;background:#333;border-radius:4px}
+ .sel{position:absolute;top:18px;height:8px;background:#ff5596;border-radius:4px}
+ .row{display:flex;justify-content:space-between;font-size:15px;font-weight:bold}
+ button{margin-top:14px;width:100%;padding:12px;font-size:16px;font-weight:bold;border:0;border-radius:8px;background:#22c55e;color:#fff;cursor:pointer}
+ .hint{font-size:12px;color:#aaa;margin-top:6px}
+</style>
+<iframe src="https://drive.google.com/file/d/<?= fileId ?>/preview" allow="autoplay"></iframe>
+<div class="wrap"><div class="track"></div><div class="sel" id="sel"></div>
+ <input type="range" id="a" min="0" max="<?= len ?>" step="0.5" value="<?= a ?>">
+ <input type="range" id="b" min="0" max="<?= len ?>" step="0.5" value="<?= b ?>">
+</div>
+<div class="row"><span>START <span id="ta"></span></span><span id="tl"></span><span>END <span id="tb"></span></span></div>
+<div class="hint">Watch the clip above, drag the orange handles. Max 1 minute.</div>
+<button id="save">✂️ Save trim</button>
+<script>
+ const A=document.getElementById('a'),B=document.getElementById('b'),L=<?= len ?>;
+ const f=x=>{x=+x;const m=Math.floor(x/60),s=(x-m*60).toFixed(1).replace('.0','');return m+':'+(s<10?'0':'')+s};
+ function upd(e){let a=+A.value,b=+B.value;
+  if(b-a>60){ if(e&&e.target===A) b=a+60; else a=b-60; }
+  if(b<=a+0.5){ if(e&&e.target===A) a=Math.max(0,b-0.5); else b=Math.min(L,a+0.5); }
+  A.value=a;B.value=b;
+  const sel=document.getElementById('sel');sel.style.left=(a/L*100)+'%';sel.style.width=((b-a)/L*100)+'%';
+  ta.textContent=f(a);tb.textContent=f(b);tl.textContent=(b-a).toFixed(1)+'s';}
+ A.oninput=upd;B.oninput=upd;upd();
+ document.getElementById('save').onclick=function(){this.textContent='Saving…';
+  google.script.run.withSuccessHandler(t=>{this.textContent='✅ Saved: '+t;setTimeout(()=>google.script.host.close(),900)})
+   .saveTrim(<?= row ?>,+A.value,+B.value);};
+</script>`;
 
 // '0:05' / '5' / '1:02' -> seconds; '' -> null; junk -> -1
 function secs_(v) {

@@ -27,7 +27,7 @@ if PREVIEWS:
 NEEDED = {"id": "Clip ID", "decision": "✅ YOUR DECISION", "status": "Status", "raw": "Raw File",
           "edited": "Edited Files", "notes": "Notes", "h1": "Hook 1", "h2": "Hook 2", "h3": "Hook 3",
           "streamer": "Streamer", "platform": "Platform", "title": "Clip Title", "top": "🎯 TOP TEXT", "send": "🚀 SEND"}
-OPTIONAL = {"start": "✂️ START", "end": "✂️ END"}
+OPTIONAL = {"cut": "✂️ CUT"}
 
 
 def col_letter(i):  # 0-based -> A1 letter
@@ -201,13 +201,14 @@ def main():
                 words = transcribe(src)
                 from render import probe
                 dur = probe(src)[2]
-                cut_a, cut_b = parse_time(cell(r, "start")), parse_time(cell(r, "end"))
+                parts = re.split(r"\s*[-–]\s*", cell(r, "cut").lstrip("'")) if cell(r, "cut") else []
+                cut_a, cut_b = (parse_time(parts[0]), parse_time(parts[1])) if len(parts) == 2 else (None, None)
                 manual = cut_a is not None or cut_b is not None
                 if manual:  # your ✂️ START / END from the sheet
                     a0 = max(0.0, min(cut_a or 0.0, max(dur - 1, 0)))
                     b0 = min(cut_b if cut_b is not None else dur, dur)
                     if b0 <= a0 + 0.5:
-                        raise RuntimeError(f"✂️ END ({cell(r, 'end')}) must be after START ({cell(r, 'start')})")
+                        raise RuntimeError(f"✂️ CUT ({cell(r, 'cut')}): end must be after start")
                     window, clip_len = a0, min(b0 - a0, C.MAX_CLIP_SECONDS)
                 else:
                     window, clip_len = best_window(words, dur, C.MAX_CLIP_SECONDS), C.MAX_CLIP_SECONDS
