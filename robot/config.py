@@ -109,3 +109,12 @@ MAKE_TIKTOK = False
 AUTO_PICK = True
 AUTO_PICKS_PER_WINDOW = 10
 AUTO_WINDOW_HOURS = 6
+
+# 📅 Posting to YouTube through Upload-Post (off until you have the account + API key)
+POSTING_ENABLED = False
+UPLOAD_POST_USERS = {1: "", 2: "", 3: "", 4: "", 5: ""}   # Upload-Post profile name for each channel
+POST_EVERY_HOURS = 3          # one Short every 3 hours on each channel
+POST_PRIVACY = "public"       # "public" = goes live at its scheduled time; "unlisted" / "private" also work
+POST_MODE = "split"           # "split": each clip goes to ONE channel (clips take turns)
+                              # "all":   each clip goes to ALL 5 channels, each with its own hook
+POST_HASHTAGS = "#GTA6 #GTAVI #GTA #shorts"

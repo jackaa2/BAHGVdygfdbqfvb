@@ -80,3 +80,13 @@ jobs:
           path: previews/
           retention-days: 3
           if-no-files-found: ignore
+      - name: Schedule finished videos on YouTube (Upload-Post; skipped while posting is off)
+        if: always()
+        working-directory: robot
+        env:
+          UPLOAD_POST_KEY: ${{ secrets.UPLOAD_POST_KEY }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
+          SHEET_ID: ${{ secrets.SHEET_ID }}
+        run: python -u poster.py

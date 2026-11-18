@@ -18,6 +18,7 @@ import config as C
 from google_api import Google
 from render import FONTS_DIR, render
 from speaker import keep_streamer
+from channels import channel_hooks
 from styles import HOOK_COLORS, HOOK_FOR
 
 ET = ZoneInfo("America/New_York")
@@ -289,22 +290,6 @@ def describe(path):
                         "stream=index,codec_type,codec_name,width,height,r_frame_rate,avg_frame_rate,start_time,duration,nb_frames,time_base:format=start_time,duration,size",
                         "-of", "compact=p=0:nk=0", path], capture_output=True, text=True)
     return " || ".join(r.stdout.split("\n")).strip()
-
-
-def channel_hooks(top, hooks):
-    """Channel 1 gets the TOP TEXT you picked; channels 2-5 each get a different one of Claude's other hooks."""
-    top = (top or "").strip()
-    if not top or top == "(no top text)" or top.startswith("⚠️ Claude"):
-        return {a: "" for a in range(1, 7)}
-    rest = []
-    for h in hooks:
-        h = (h or "").strip()
-        if h and not h.startswith("(") and not h.startswith("⚠️") and h != top and h not in rest:
-            rest.append(h)
-    out = {1: top}
-    for a in range(2, 7):
-        out[a] = rest[a - 2] if len(rest) >= a - 1 else top
-    return out
 
 
 def make_sample(g, sheet, rows, cell, clip_id):
