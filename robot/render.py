@@ -197,15 +197,23 @@ def watermark_png(acct, workdir, wm_name=None):
     return out, im.size
 
 
+def has_audio(src):
+    r = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "a", "-show_entries", "stream=index",
+                        "-of", "csv=p=0", src], capture_output=True, text=True)
+    return bool(r.stdout.strip())
+
+
 def render(src, out, acct, words, hook, hook_color, hook_font, handle, spot, zoom, trim, workdir,
-           platform="twitch", streamer="", max_len=25.0, wm_name=None):
+           platform="twitch", streamer="", max_len=25.0, wm_name=None, bleeps=()):
+    from profanity import censor
     src_w, src_h, dur = probe(src)
     pic = PICTURE[acct]
     fg_w, fg_h, top, bottom = video_box(src_w, src_h, zoom, pic["y_shift"])
     trim = max(0.0, min(trim, max(dur - 3, 0)))
     length = min(dur - trim, max_len)
-    shifted = [dict(w, start=w["start"] - trim, end=min(w["end"] - trim, length))
+    shifted = [dict(w, word=censor(w["word"]), start=w["start"] - trim, end=min(w["end"] - trim, length))
                for w in words if w["end"] > trim and w["start"] - trim < length - 0.15]
+    beeps = [(max(0.0, a - trim), min(b - trim, length)) for a, b in bleeps if b > trim and a - trim < length]
     ass_path = os.path.join(workdir, f"a{acct}_{wm_name or 'A'}.ass")
     with open(ass_path, "w", encoding="utf-8") as f:
         f.write(build_ass(shifted, acct, hook, hook_color, hook_font, handle, spot, length, (top, bottom)))
@@ -240,9 +248,17 @@ def render(src, out, acct, words, hook, hook_color, hook_font, handle, spot, zoo
         vf += f";[{last}][{i + 1}:v]overlay={ox}:{oy}[s{i + 1}]"
         last = f"s{i + 1}"
     vf += f";[{last}]null[v]"
+    audio_map = "0:a?"
+    if beeps and has_audio(src):
+        on = "+".join(f"between(t,{a:.3f},{b:.3f})" for a, b in beeps)
+        vf += (f";[0:a]asetpts=PTS-STARTPTS,volume=0:enable='{on}'[am]"
+               f";sine=frequency=1000:sample_rate=44100:duration={length:.2f},volume=0.6,"
+               f"volume=0:enable='not({on})'[bp]"
+               f";[am][bp]amix=inputs=2:duration=first:normalize=0[aout]")
+        audio_map = "[aout]"
     cmd = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-ss", f"{trim:.2f}", "-t", f"{length:.2f}",
            "-i", src] + sum([["-loop", "1", "-t", f"{length:.2f}", "-i", x] for x in extra_inputs], []) + [
-           "-filter_complex", vf, "-t", f"{length:.2f}", "-map", "[v]", "-map", "0:a?", "-dn", "-sn",
+           "-filter_complex", vf, "-t", f"{length:.2f}", "-map", "[v]", "-map", audio_map, "-dn", "-sn",
            "-c:v", "libx264", "-preset", "superfast", "-crf", "23", "-maxrate", "4M", "-bufsize", "8M", "-pix_fmt", "yuv420p", "-r", "30",
            "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-map_metadata", "-1",
            "-movflags", "+faststart", out]
