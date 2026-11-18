@@ -219,7 +219,7 @@ def main():
                 hooks = {1: cell(r, "h1"), 2: cell(r, "h2"), 3: cell(r, "h3")}
                 made = 0
 
-                # YouTube A1-A6 + TikTok T1-T5 (TikTok N = YouTube N, only the watermark differs)
+                # YouTube A1-A5 + TikTok T1-T5 (TikTok N = YouTube N, only the watermark differs)
                 from render import WM_DIR
                 jobs = [(a, f"A{a}", C.ACCOUNT_FOLDERS[a], f"{clip_id}_A{a}.mp4") for a in sorted(C.CHANNELS)]
                 jobs += [(t, f"T{t}", C.TIKTOK_FOLDERS[t], f"{clip_id}_TT{t}.mp4") for t in sorted(C.TIKTOK_FOLDERS)

@@ -70,8 +70,7 @@ CHANNELS = {
     2: "Vice City Streamers | GTA 6",
     3: "GTA 6 Streamer Highlights",
     4: "GTA 6 TV",
-    5: "Streamers In GTA 6",
-    6: "Streamers In Leonida | GTA6",
+    5: "Streamers In Leonida | GTA6",
 }
 
 # TikTok accounts: own "Ready to Post (TikTok)" folder, one sub-folder each (watermarks to come: assets/watermarks/T1..T5.png)
