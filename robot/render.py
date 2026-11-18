@@ -226,7 +226,7 @@ def render(src, out, acct, words, hook, hook_color, hook_font, handle, spot, zoo
             extra_inputs.append(hook_png); overlays.append(("(W-w)/2", str(hy)))
 
     vf = (
-        f"[0:v]split=2[a][b];"
+        f"[0:v]setpts=PTS-STARTPTS,split=2[a][b];"
         f"[a]scale=270:480:force_original_aspect_ratio=increase,crop=270:480,boxblur=12:2,"
         f"scale={W}:{H},eq=brightness={pic['blur_dim']}:saturation=1.2[bg];"
         + (f"[b]scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H},"
@@ -241,8 +241,8 @@ def render(src, out, acct, words, hook, hook_color, hook_font, handle, spot, zoo
         last = f"s{i + 1}"
     vf += f";[{last}]null[v]"
     cmd = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-ss", f"{trim:.2f}", "-t", f"{length:.2f}",
-           "-i", src] + sum([["-loop", "1", "-i", x] for x in extra_inputs], []) + [
-           "-filter_complex", vf, "-t", f"{length:.2f}", "-map", "[v]", "-map", "0:a?",
+           "-i", src] + sum([["-loop", "1", "-t", f"{length:.2f}", "-i", x] for x in extra_inputs], []) + [
+           "-filter_complex", vf, "-t", f"{length:.2f}", "-map", "[v]", "-map", "0:a?", "-dn", "-sn",
            "-c:v", "libx264", "-preset", "superfast", "-crf", "23", "-maxrate", "4M", "-bufsize", "8M", "-pix_fmt", "yuv420p", "-r", "30",
            "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-map_metadata", "-1",
            "-movflags", "+faststart", out]
