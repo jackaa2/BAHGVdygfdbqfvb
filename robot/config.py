@@ -119,6 +119,8 @@ UPLOAD_POST_USERS = {1: "GTA6Highlights",   # -> Streamers In Leonida | GTA6 (@g
                      5: "StreamersInGTA6"}  # -> StreamersInGTA6
 # (these are Upload-Post usernames, matched by the YouTube channel each one has connected)
 POST_EVERY_HOURS = 3          # one Short every 3 hours on each channel
+SLOT_JITTER_MIN = 25          # each post time is nudged by up to ± this many minutes (looks human, not :00 / :36)
+SLOT_MIN_APART_MIN = 7        # no two channels post within this many minutes of each other
 POST_PRIVACY = "public"       # "public" = goes live at its scheduled time; "unlisted" / "private" also work
 POST_MODE = "split"           # "split": each clip goes to ONE channel (clips take turns)
                               # "all":   each clip goes to ALL 5 channels, each with its own hook

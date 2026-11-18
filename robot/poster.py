@@ -277,13 +277,27 @@ def main():
     first = now + dt.timedelta(minutes=15)
 
     def next_slot(a, after):
-        """Fixed timetable: every POST_EVERY_HOURS, channels staggered (ch1 :00, ch2 +36 min, ...)."""
+        """One post every POST_EVERY_HOURS per channel, channels staggered, and each slot nudged by a
+        random few minutes (e.g. 9:23, 12:41, 3:07) so it doesn't look robotic. Never two channels within
+        SLOT_MIN_APART_MIN minutes of each other."""
+        import random
         step = C.POST_EVERY_HOURS * 60
         offset = (a - 1) * step // len(C.CHANNELS)
-        t = after.replace(hour=0, minute=0, second=0, microsecond=0) + dt.timedelta(minutes=offset)
-        while t < after or t in booked[a]:
-            t += dt.timedelta(minutes=step)
-        return t
+        base = after.replace(hour=0, minute=0, second=0, microsecond=0) - dt.timedelta(days=1) \
+            + dt.timedelta(minutes=offset)
+        everyone = [t for ts in booked.values() for t in ts]
+        while True:
+            base += dt.timedelta(minutes=step)
+            if any(abs(t - base) < dt.timedelta(minutes=step / 2) for t in booked[a]):
+                continue                                     # this channel already has that slot
+            j = random.Random(f"{a}-{base:%Y%m%d%H%M}").randint(-C.SLOT_JITTER_MIN, C.SLOT_JITTER_MIN)
+            t = base + dt.timedelta(minutes=j)
+            for _ in range(20):                              # keep clear of every other channel's posts
+                if all(abs(t - o) >= dt.timedelta(minutes=C.SLOT_MIN_APART_MIN) for o in everyone):
+                    break
+                t += dt.timedelta(minutes=C.SLOT_MIN_APART_MIN)
+            if t >= after:
+                return t
 
     head, rows = panel(g, sheet)
     drop = []
