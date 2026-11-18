@@ -13,7 +13,7 @@ LOOKBACK_HOURS = 6                      # only clips made in the last N hours
 MIN_VIEWS_CATEGORY = 300               # GTA 6 category clips (any streamer)
 MIN_VIEWS_TRACKED = 100                # clips from streamers on our list
 MIN_SECONDS, MAX_SECONDS = 6, 60
-PREFERRED_SECONDS = 25         # clips up to this length are preferred; longer ones need ~40% more views
+PREFERRED_SECONDS = 60         # no length preference: any clip up to 1 min ranks on views alone
 LANGUAGES = {"en"}                      # skip non-English clips
 MAX_NEW_CLIPS_PER_RUN = 25              # every 30 min -> ~50 clips an hour
 
