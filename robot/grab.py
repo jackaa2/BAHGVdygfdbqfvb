@@ -40,6 +40,12 @@ def clip_key(url):
     return m.group(1).lower() if m else (url or "").lower()
 
 
+# clip titles that almost always mean nudity / sexual content -> never grabbed (Claude also checks the video itself)
+NSFW_TITLE = re.compile(r"(?i)(🔞|\b18\+|nud(e|ity)|naked|nsfw|strip ?club|stripper|lap ?dance|boob|booba|titt|"
+                        r"\bflash(ed|ing)?\b|topless|thong|onlyfans|\bporn|\bsex|goon(er|ing)?|horny|\bthirst|"
+                        r"twerk|\bass\b|\bbutt\b|gyat+)")
+
+
 def is_gta(c, gta_ids):
     if c["platform"] == "Twitch":
         return c.get("game_id") in gta_ids
@@ -383,6 +389,8 @@ def main():
             why["wrong length"] += 1; continue
         if c["platform"] == "Twitch" and c["language"] and c["language"].split("-")[0] not in C.LANGUAGES:
             why["not English"] += 1; continue
+        if NSFW_TITLE.search(c.get("title") or ""):
+            why["nsfw title"] = why.get("nsfw title", 0) + 1; continue
         seen.add(clip_key(c["url"])); picks.append(c)
         if len(picks) >= max_new:
             break

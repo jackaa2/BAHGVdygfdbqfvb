@@ -42,7 +42,9 @@ Reply with ONLY this JSON, nothing else:
 
 "postable": false if the clip is not worth posting: it is not GTA 6 (another game, or just talking with
 no GTA 6 on screen or being discussed), nothing happens (loading screens, menus, dead air, AFK),
-it isn't a streamer moment, it's mostly non-English, it's unwatchable, or it's mainly hateful / sexual content.
+it isn't a streamer moment, it's mostly non-English, it's unwatchable, it's hateful, OR it shows ANY nudity or
+sexual content at all - even brief or partial (exposed breasts/butts, strippers, lap dances, sex scenes, strip clubs,
+explicit poses), in the game or on the streamer's camera. When in doubt about nudity, it's false.
 Otherwise true. "reason": why, in a few words.
 
 Hooks = the caption on top of the Short AND its YouTube title. Write like a funny clip-page admin, not an AI:
