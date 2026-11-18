@@ -199,13 +199,18 @@ def main():
     cands = []
     tw = Twitch()
     test_game = (os.environ.get("TEST_GAME") or "").strip()
-    test = bool(test_game)
+    test_kick = (os.environ.get("TEST_KICK") or "").strip().lower() in ("yes", "true", "1")
+    test = bool(test_game) or test_kick
     max_new = int(os.environ.get("TEST_MAX") or 5) if test else C.MAX_NEW_CLIPS_PER_RUN
-    if test:
+    if test_kick:
+        print(f"TEST MODE: Kick clips from the Streamers tab ({len(kick_slugs)} channels), any game, up to {max_new}")
+        tw_logins = set()
+        since = dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=7)
+    elif test:
         print(f"TEST MODE: category '{test_game}', up to {max_new} clips")
         tw_logins, kick_slugs = set(), set()   # category only, keeps the test clean
-    gta = tw.game_ids([test_game] if test else C.GAME_NAMES)
-    if not gta:
+    gta = [] if test_kick else tw.game_ids([test_game] if test else C.GAME_NAMES)
+    if not gta and not test_kick:
         errors.append(f"category not found: {test_game or C.GAME_NAMES}")
     for gid in gta:
         cands += [dict(c, min=(100 if test else C.MIN_VIEWS_CATEGORY)) for c in tw.clips(since, game_id=gid, first=100, pages=C.CATEGORY_PAGES)]
@@ -215,10 +220,10 @@ def main():
         except Exception as e:
             errors.append(f"Twitch {login}: {e}")
     for slug in sorted(kick_slugs):
-        clips, err = kick_clips(slug, since)
+        clips, err = kick_clips(slug, since, period=("week" if test_kick else "day"))
         if err:
             errors.append(err)
-        cands += [dict(c, min=C.MIN_VIEWS_TRACKED, tracked=True) for c in clips]
+        cands += [dict(c, min=(0 if test_kick else C.MIN_VIEWS_TRACKED), tracked=not test_kick) for c in clips]
 
     # --- filter, dedupe, best first ---
     seen, picks = set(), []

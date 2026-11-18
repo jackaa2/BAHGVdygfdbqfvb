@@ -17,6 +17,10 @@ on:
         description: "Delete the videos of these clip IDs (comma separated)"
         required: false
         default: ""
+      test_kick:
+        description: "TEST ONLY: grab Kick clips (any game) from the Kick streamers on the Streamers tab (type yes)"
+        required: false
+        default: ""
       test_max:
         description: "TEST ONLY: max clips to grab"
         required: false
@@ -48,6 +52,7 @@ jobs:
           SHEET_ID: ${{ secrets.SHEET_ID }}
           TEST_GAME: ${{ inputs.test_game }}
           TEST_MAX: ${{ inputs.test_max }}
+          TEST_KICK: ${{ inputs.test_kick }}
           PURGE_ALL: ${{ inputs.purge_all }}
           PURGE_IDS: ${{ inputs.purge_ids }}
         run: python grab.py

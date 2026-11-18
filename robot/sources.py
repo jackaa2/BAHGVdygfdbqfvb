@@ -77,11 +77,11 @@ def parse_time(value):
     return dt.datetime.fromisoformat(f"{m.group(1)}.{frac}{tz}")
 
 
-def kick_clips(slug, since):
+def kick_clips(slug, since, period="day"):
     """Best effort: Kick has no official clips API. Returns [] (and the error text) if blocked."""
     try:
         r = requests.get(f"https://kick.com/api/v2/channels/{slug}/clips",
-                         params={"sort": "view", "time": "day"}, headers=UA, timeout=30)
+                         params={"sort": "view", "time": period}, headers=UA, timeout=30)
         if r.status_code != 200:
             return [], f"Kick {slug}: HTTP {r.status_code}"
         out = []
