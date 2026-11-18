@@ -89,6 +89,41 @@ def cleanup(g, now_et):
     return n
 
 
+def cleanup_rows(g, sheet, now_et):
+    """Same ages as the Drive clean-up: rejected 1 day, never decided 3 days, everything else 7 days.
+    Age comes from the clip ID (MMDD-...)."""
+    head = [str(h).strip() for h in (g.get_values(sheet, f"'{C.PANEL_TAB}'!A{C.HEADER_ROWS}:Z{C.HEADER_ROWS}") or [[]])[0]]
+    if "Clip ID" not in head or "✅ YOUR DECISION" not in head:
+        return 0
+    ci, di = head.index("Clip ID"), head.index("✅ YOUR DECISION")
+    rows = g.get_values(sheet, f"'{C.PANEL_TAB}'!A{C.HEADER_ROWS + 1}:Z")
+    today = now_et.date()
+    old = []
+    for i, r in enumerate(rows):
+        cid = str(r[ci]).strip() if len(r) > ci else ""
+        m = re.match(r"^(\d\d)(\d\d)-", cid)
+        if not m:
+            continue
+        try:
+            d = dt.date(today.year, int(m.group(1)), int(m.group(2)))
+        except ValueError:
+            continue
+        if d > today:
+            d = d.replace(year=today.year - 1)   # December clip seen in January
+        age = (today - d).days
+        dec = str(r[di]).strip() if len(r) > di else ""
+        limit = C.CLEANUP_DAYS["rejected"] if dec == "Reject" else 7 if dec == "Approve" else C.CLEANUP_DAYS["new"]
+        if age > limit:
+            old.append(i)
+    if not old:
+        return 0
+    gid = g.sheet_gid(sheet, C.PANEL_TAB)
+    g.batch_update(sheet, [{"deleteDimension": {"range": {
+        "sheetId": gid, "dimension": "ROWS", "startIndex": C.HEADER_ROWS + i, "endIndex": C.HEADER_ROWS + i + 1}}}
+        for i in sorted(old, reverse=True)])
+    return len(old)
+
+
 def purge_ids(g, ids):
     """Delete every video (raw + 6 versions) belonging to these clip IDs."""
     n = 0
@@ -343,6 +378,14 @@ def main():
             print(f"Clean-up: deleted {removed} old file(s)")
     except Exception as e:
         errors.append(f"clean-up: {e}")
+
+    # --- Sheet clean-up: drop rows whose videos the clean-up has removed, so the sheet stays fast forever ---
+    try:
+        n = cleanup_rows(g, sheet, now_et)
+        if n:
+            print(f"Clean-up: removed {n} old row(s) from the sheet")
+    except Exception as e:
+        errors.append(f"row clean-up: {e}")
 
     # --- Drive space meter (Control Panel J1:M1) ---
     try:
