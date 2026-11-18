@@ -30,12 +30,17 @@ jobs:
         with:
           path: ~/.cache/huggingface
           key: models-whisper-small-en-ecapa-v2
-      - name: Install
-        timeout-minutes: 12
+      - name: Install (required)
+        timeout-minutes: 6
         run: |
           command -v ffmpeg || (sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg)
-          pip install -q --timeout 60 --retries 3 torch torchaudio --index-url https://download.pytorch.org/whl/cpu
-          pip install -q --timeout 60 --retries 3 requests faster-whisper fonttools speechbrain pillow
+          pip install -q --timeout 60 --retries 3 requests faster-whisper fonttools pillow
+      - name: Install voice check (optional, skipped if slow)
+        timeout-minutes: 4
+        continue-on-error: true
+        run: |
+          pip install -q --timeout 30 --retries 1 torch torchaudio --index-url https://download.pytorch.org/whl/cpu
+          pip install -q --timeout 30 --retries 1 speechbrain
       - name: Make versions
         working-directory: robot
         env:
