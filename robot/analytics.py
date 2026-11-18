@@ -13,6 +13,26 @@ import config as C
 from google_api import Google
 
 ET = ZoneInfo("America/New_York")
+
+
+def parse_et(v):
+    """A date-time from the sheet in whatever way it comes back -> datetime (ET), or None."""
+    s = str(v or "").strip()
+    if not s:
+        return None
+    try:   # sheet day-number (unformatted)
+        f = float(s)
+        if 30000 < f < 80000:
+            return (dt.datetime(1899, 12, 30) + dt.timedelta(days=f)).replace(tzinfo=ET)
+    except ValueError:
+        pass
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%m/%d/%Y %H:%M:%S", "%m/%d/%Y %H:%M",
+                "%m/%d/%Y %I:%M:%S %p", "%m/%d/%Y %I:%M %p", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%dT%H:%M"):
+        try:
+            return dt.datetime.strptime(s, fmt).replace(tzinfo=ET)
+        except ValueError:
+            continue
+    return None
 BASE = "https://api.upload-post.com/api"
 CHART_ID = 1544922089
 MAX_POST_CHECKS = 90          # Upload-Post allows ~100 stat reads per 5 minutes
@@ -70,12 +90,9 @@ def main():
     stamp = (g.get_values(sheet, f"'{C.ANALYTICS_TAB}'!A2") or [[""]])[0]
     stamp = stamp[0] if stamp else ""
     if not os.environ.get("FORCE_ANALYTICS"):
-        try:
-            last = dt.datetime.strptime(stamp.split("Updated: ")[1][:16], "%Y-%m-%d %H:%M").replace(tzinfo=ET)
-            if now - last < dt.timedelta(hours=C.ANALYTICS_EVERY_HOURS):
-                print("Analytics: refreshed recently, skipping"); return
-        except (IndexError, ValueError):
-            pass
+        last = parse_et(stamp.split("Updated: ")[1][:16]) if "Updated: " in stamp else None
+        if last and now - last < dt.timedelta(hours=C.ANALYTICS_EVERY_HOURS):
+            print("Analytics: refreshed recently, skipping"); return
     H = {"Authorization": f"Apikey {key}"}
     problems = []
 
@@ -126,10 +143,7 @@ def main():
         rid = str(p[12]).strip()
         if not rid or checked >= MAX_POST_CHECKS:
             continue
-        try:
-            booked = dt.datetime.strptime(str(p[0])[:16], "%Y-%m-%d %H:%M").replace(tzinfo=ET)
-        except ValueError:
-            booked = now
+        booked = parse_et(p[0]) or now
         if booked < cutoff and p[9] != "":
             continue   # older than 2 weeks: keep the last numbers
         checked += 1

@@ -19,6 +19,26 @@ import config as C
 from google_api import Google
 
 ET = ZoneInfo("America/New_York")
+
+
+def parse_et(v):
+    """A date-time from the sheet in whatever way it comes back -> datetime (ET), or None."""
+    s = str(v or "").strip()
+    if not s:
+        return None
+    try:   # sheet day-number (unformatted)
+        f = float(s)
+        if 30000 < f < 80000:
+            return (dt.datetime(1899, 12, 30) + dt.timedelta(days=f)).replace(tzinfo=ET)
+    except ValueError:
+        pass
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%m/%d/%Y %H:%M:%S", "%m/%d/%Y %H:%M",
+                "%m/%d/%Y %I:%M:%S %p", "%m/%d/%Y %I:%M %p", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%dT%H:%M"):
+        try:
+            return dt.datetime.strptime(s, fmt).replace(tzinfo=ET)
+        except ValueError:
+            continue
+    return None
 API = "https://api.upload-post.com/api/upload"
 # Review tab columns (0-based)
 R_ID, R_CH, R_NAME, R_HOOK, R_WATCH, R_STREAMER, R_POST, R_REDO, R_SURE, R_STATUS, R_LIVE, R_FILE = range(12)
@@ -87,12 +107,9 @@ def tidy(g, sheet, review, now):
     old = []
     for i, r in enumerate(review):
         if len(r) > R_LIVE and str(r[R_STATUS]).startswith("📅"):
-            try:
-                live = dt.datetime.strptime(str(r[R_LIVE])[:16], "%Y-%m-%d %H:%M").replace(tzinfo=ET)
-                if now - live > dt.timedelta(days=1):
-                    old.append(i)
-            except ValueError:
-                pass
+            live = parse_et(r[R_LIVE])
+            if live and now - live > dt.timedelta(days=1):
+                old.append(i)
     if old:
         g.batch_update(sheet, [{"deleteDimension": {"range": {"sheetId": gid, "dimension": "ROWS",
                                                               "startIndex": C.REVIEW_HEADER_ROW + i, "endIndex": C.REVIEW_HEADER_ROW + 1 + i}}}
@@ -141,6 +158,19 @@ def main():
     g = Google()
     review = [r + [""] * (12 - len(r)) for r in (g.get_values(sheet, f"'{C.REVIEW_TAB}'!A{C.REVIEW_HEADER_ROW + 1}:L", formulas=True) or [])]
     review = do_redos(g, sheet, review)
+    # videos whose clip the week-old clean-up already removed can't be posted any more: take them off Review
+    head0, rows0 = panel(g, sheet)
+    if "Clip ID" in head0 and rows0:
+        alive = {str(r[head0.index("Clip ID")]).strip() for r in rows0 if len(r) > head0.index("Clip ID")}
+        gone = [i for i, r in enumerate(review) if str(r[R_ID]).strip() not in alive
+                and not str(r[R_STATUS]).startswith("📅")]
+        if gone:
+            gid = g.sheet_gid(sheet, C.REVIEW_TAB)
+            g.batch_update(sheet, [{"deleteDimension": {"range": {"sheetId": gid, "dimension": "ROWS",
+                "startIndex": C.REVIEW_HEADER_ROW + i, "endIndex": C.REVIEW_HEADER_ROW + 1 + i}}}
+                for i in sorted(gone, reverse=True)])
+            review = [r for i, r in enumerate(review) if i not in set(gone)]
+            print(f"Review: removed {len(gone)} expired video(s)")
     if backfill(g, sheet, review):
         review = [r + [""] * (12 - len(r)) for r in (g.get_values(sheet, f"'{C.REVIEW_TAB}'!A{C.REVIEW_HEADER_ROW + 1}:L", formulas=True) or [])]
 
@@ -154,7 +184,9 @@ def main():
     clip_times = {}   # clip -> every time it's already booked (on any channel)
     for p in g.get_values(sheet, f"'{C.POSTS_TAB}'!B2:H") or []:
         try:
-            a = int(p[0]); t = dt.datetime.strptime(str(p[6])[:16], "%Y-%m-%d %H:%M").replace(tzinfo=ET)
+            a = int(p[0]); t = parse_et(p[6])
+            if t is None:
+                continue
             if a in last and (last[a] is None or t > last[a]):
                 last[a] = t
             clip_times.setdefault(str(p[2]).strip(), []).append(t)
@@ -164,7 +196,9 @@ def main():
     booked = {a: set() for a in C.CHANNELS}
     for p in g.get_values(sheet, f"'{C.POSTS_TAB}'!B2:H") or []:
         try:
-            booked[int(p[0])].add(dt.datetime.strptime(str(p[6])[:16], "%Y-%m-%d %H:%M").replace(tzinfo=ET))
+            t = parse_et(p[6])
+            if t:
+                booked[int(p[0])].add(t)
         except (ValueError, IndexError, KeyError):
             pass
 
