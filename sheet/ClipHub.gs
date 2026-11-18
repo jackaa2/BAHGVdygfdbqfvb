@@ -33,10 +33,11 @@ const NAMES = {
 };
 const ROOT_NAME = 'GTA6 Clip Hub - VIDEOS';
 const FOLDERS = Object.keys(NAMES);
+// Status is automatic and only ever: New -> Pending (approved, captions being made) -> Ready to Post
 const MOVE = {
-  Approve: { folder: '03_Approved', status: 'Approved' },
-  Reject:  { folder: '06_Rejected', status: 'Rejected' },
-  Hold:    { folder: '02_Screened', status: 'Screened' },
+  Approve: { folder: '03_Approved', status: 'Pending' },
+  Reject:  { folder: '06_Rejected', status: 'New' },
+  Hold:    { folder: '02_Screened', status: 'New' },
   '':      { folder: '01_Raw', status: 'New' },
 };
 
@@ -232,7 +233,7 @@ function hasEditWork_() {
   if (last <= HEADER_ROWS || !c.DECISION || !c.STATUS) return false;
   const d = sh.getRange(HEADER_ROWS + 1, c.DECISION, last - HEADER_ROWS, 1).getValues();
   const st = sh.getRange(HEADER_ROWS + 1, c.STATUS, last - HEADER_ROWS, 1).getValues();
-  return d.some((v, i) => v[0] === 'Approve' && (st[i][0] === 'Approved' || st[i][0] === ''));
+  return d.some((v, i) => v[0] === 'Approve' && st[i][0] !== 'Ready to Post');
 }
 
 function robotTick() {
@@ -281,7 +282,7 @@ function processRow_(sh, r, c) {
     if (c.STATUS) {
       const status = sh.getRange(r, c.STATUS);
       const cur = String(status.getValue());
-      const later = ['Editing', 'Ready to Post', 'Posted'].includes(cur);
+      const later = cur === 'Ready to Post';
       if (!(later && decision === 'Approve')) status.setValue(rule.status);
     }
     if (decision === 'Approve') kickEdit_();

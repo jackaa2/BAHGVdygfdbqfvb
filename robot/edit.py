@@ -1,7 +1,7 @@
 """Every 10 min: take clips marked Approve, make 6 channel versions (captions + hook + watermark),
 save each into "4 - Ready to Post/Account N", then mark the clip Ready to Post.
 
-Status flow in the Control Panel:  Approved -> Editing -> Ready to Post   (or Edit Failed + reason in Notes)
+Status: New -> Pending (approved) -> Ready to Post. Failures stay Pending with the reason in Notes (3 tries).
 """
 import datetime as dt
 import os
@@ -113,7 +113,10 @@ def main():
 
     todo = []
     for i, r in enumerate(rows):
-        if cell(r, "id") and cell(r, "decision") == "Approve" and cell(r, "status") in ("Approved", ""):
+        if cell(r, "id") and cell(r, "decision") == "Approve" and cell(r, "status") != "Ready to Post":
+            tries = re.findall(r"Edit failed \(try (\d+)\)", cell(r, "notes"))
+            if tries and int(tries[-1]) >= 3:
+                continue  # gave up after 3 tries; re-pick Approve after fixing to retry
             todo.append((C.HEADER_ROWS + 1 + i, r))
     todo = todo[:C.EDIT_MAX_PER_RUN]
     print(f"{len(todo)} approved clip(s) to edit")
@@ -125,7 +128,7 @@ def main():
         hook_font = brand_font(g, tmp)
         for rownum, r in todo:
             clip_id = cell(r, "id")
-            put(rownum, "status", "Editing")
+            put(rownum, "status", "Pending")
             try:
                 fid = file_id(cell(r, "raw"))
                 if not fid:
@@ -153,8 +156,10 @@ def main():
             except Exception as e:
                 traceback.print_exc()
                 msg = e.stderr[-300:] if isinstance(e, subprocess.CalledProcessError) else str(e)
-                put(rownum, "status", "Edit Failed")
-                put(rownum, "notes", f"⚠ Edit failed {dt.datetime.now(ET):%a %I:%M %p}: {msg[:300]}")
+                tries = re.findall(r"Edit failed \(try (\d+)\)", cell(r, "notes"))
+                n = int(tries[-1]) + 1 if tries else 1
+                put(rownum, "status", "Pending")
+                put(rownum, "notes", f"⚠ Edit failed (try {n}) {dt.datetime.now(ET):%a %I:%M %p}: {msg[:250]}")
 
 
 REQUIRED = ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_REFRESH_TOKEN", "SHEET_ID"]
