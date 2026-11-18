@@ -131,11 +131,11 @@ def transcribe(path):
     res = subprocess.run(["ffmpeg", "-v", "error", "-i", path, "-vn", "-ac", "1", "-ar", "16000",
                           "-f", "f32le", "-"], capture_output=True)
     if res.returncode != 0:      # no audio track -> no captions
-        return Words()
+        return []
     pcm = res.stdout
     audio = np.frombuffer(pcm, dtype=np.float32)
     if audio.size < 16000:
-        return Words()
+        return []
     segs, _ = _model.transcribe(audio, word_timestamps=True, vad_filter=True, language="en",
                                 condition_on_previous_text=False)
     seglist = []
@@ -145,19 +145,9 @@ def transcribe(path):
         if ws:
             seglist.append({"start": float(sg.start), "end": float(sg.end), "text": sg.text.strip(), "words": ws,
                             "no_speech_prob": float(sg.no_speech_prob), "avg_logprob": float(sg.avg_logprob)})
-    every_word = [w for sg in seglist for w in sg["words"]]
     if C.STREAMER_ONLY_CAPTIONS:
         seglist = keep_streamer(audio, seglist)
-    words = Words(w for sg in seglist for w in sg["words"])
-    # bleep swears from EVERYONE in the clip (not just the streamer); captions stay streamer-only
-    from profanity import bleep_windows
-    words.bleeps = bleep_windows(every_word) if C.BLEEP_SWEARS else []
-    return words
-
-
-class Words(list):
-    """Caption words, plus .bleeps = (start, end) times of swear words to beep."""
-    bleeps = []
+    return [w for sg in seglist for w in sg["words"]]
 
 
 def main():
@@ -244,7 +234,7 @@ def main():
                            hook_font, st_["handle"] if C.SHOW_WATERMARK else "", st_["spot"], st_["zoom"],
                            window if manual else min(window + st_["trim"], max(dur - 3, 0)), tmp,
                            platform=cell(r, "platform") or "Twitch", streamer=cell(r, "streamer"),
-                           max_len=clip_len, wm_name=wm_name, bleeps=getattr(words, "bleeps", []))
+                           max_len=clip_len, wm_name=wm_name)
                     if PREVIEWS:
                         subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", "3", "-i", out, "-frames:v", "1",
                                         "-vf", "scale=360:640", os.path.join(PREVIEWS, name.replace(".mp4", ".jpg"))])
@@ -321,8 +311,7 @@ def make_sample(g, sheet, rows, cell, clip_id):
         out = os.path.join(out_dir, f"SAMPLE_{clip_id}.mp4")
         render(src, out, 1, words, static_caption(top, ""), "#FFFFFF", hook_font, "", st_["spot"], st_["zoom"],
                best_window(words, dur, C.MAX_CLIP_SECONDS), tmp, platform=cell(r, "platform") or "Twitch",
-               streamer=cell(r, "streamer"), max_len=C.MAX_CLIP_SECONDS, wm_name="A1",
-               bleeps=getattr(words, "bleeps", []))
+               streamer=cell(r, "streamer"), max_len=C.MAX_CLIP_SECONDS, wm_name="A1")
         pv = g.ensure_folder(C.ROOT_FOLDER[0], "_previews (test)")
         old = g.find_child(pv, os.path.basename(out), folder=False)
         if old:

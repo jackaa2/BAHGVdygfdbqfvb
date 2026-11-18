@@ -100,6 +100,3 @@ NO_HOOK_TEXT = "⚠️ Claude couldn't write a hook - type your own here"
 ONLY_TIERS = {1, 2}
 # ...except a GTA 6 clip from ANY streamer gets in once it's this popular (it still sorts after T1/T2)
 POPULAR_ANY_VIEWS = None  # off: T1/T2 only for now (set to 1000 to let popular clips from anyone in)
-
-# 🔇 beep out swear words in the audio and star them out in the captions (f***)
-BLEEP_SWEARS = True
