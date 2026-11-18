@@ -112,7 +112,12 @@ AUTO_WINDOW_HOURS = 6
 
 # 📅 Posting to YouTube through Upload-Post (off until you have the account + API key)
 POSTING_ENABLED = True       # safe: nothing posts until someone ticks POST IT on the Review tab
-UPLOAD_POST_USERS = {1: "ch1-leonida", 2: "ch2-vicecity", 3: "ch3-highlights", 4: "ch4-gta6tv", 5: "ch5-streamersgta6"}   # Upload-Post profile name for each channel
+UPLOAD_POST_USERS = {1: "GTA6Highlights",   # -> Streamers In Leonida | GTA6 (@gta6leonidaclip)
+                     2: "Leonida",          # -> Vice City Streamers | GTA 6 (@gta6vcstreamers)
+                     3: "default",          # -> GTA 6 Streamer Highlights (@gta6twitchclip)
+                     4: "ch1-leonida",      # -> GTA 6 TV (@streamersinvc)
+                     5: "StreamersInGTA6"}  # -> StreamersInGTA6
+# (these are Upload-Post usernames, matched by the YouTube channel each one has connected)
 POST_EVERY_HOURS = 3          # one Short every 3 hours on each channel
 POST_PRIVACY = "public"       # "public" = goes live at its scheduled time; "unlisted" / "private" also work
 POST_MODE = "split"           # "split": each clip goes to ONE channel (clips take turns)
