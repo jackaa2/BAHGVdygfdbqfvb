@@ -59,7 +59,7 @@ function onOpen() {
     .addItem('⏱ Connect robot timer (GitHub key)…', 'connectRobot')
     .addItem('▶ Run grabber now', 'runGrabberNow')
     .addSeparator()
-    .addItem('✂️ Trim selected clip', 'trimSelected')
+    .addItem('✂️ Connect trimmer (after deploying web app)…', 'connectTrimmer')
     .addItem('📱 Set alert phone numbers (Verizon)…', 'setAlertPhones')
     .addToUi();
 }
@@ -136,21 +136,19 @@ function onDecisionEdit(e) {
   if (e.range.getA1Notation() === DELETE_BOX) {
     if (e.range.getValue() === true) {
       e.range.setValue(false);
-      deleteRejected();
+      const p = PropertiesService.getScriptProperties();
+      const armed = Number(p.getProperty('DELETE_ARMED') || 0);
+      if (Date.now() - armed < 30 * 1000) { p.deleteProperty('DELETE_ARMED'); deleteRejected_(true); }
+      else {
+        p.setProperty('DELETE_ARMED', String(Date.now()));
+        const n = countRejected_();
+        SpreadsheetApp.getActive().toast(n ? 'Tick the box AGAIN within 30 sec to delete ' + n + ' rejected clip(s) for good.' : 'No rejected clips.', '🗑 Are you sure?', 10);
+      }
     }
     return;
   }
   const c = cols_(sh);
   const c1 = e.range.getColumn(), c2 = e.range.getLastColumn();
-  if (c.TRIM && c.TRIM >= c1 && c.TRIM <= c2 && e.range.getNumRows() === 1) {
-    const r = e.range.getRow();
-    if (r > HEADER_ROWS && sh.getRange(r, c.TRIM).getValue() === true) {
-      sh.getRange(r, c.TRIM).setValue(false);
-      try { openTrimmer_(r); }
-      catch (err) { SpreadsheetApp.getActive().toast('Click any cell in this row, then 🎬 Clip Hub > ✂️ Trim selected clip.', '✂️ Trim', 8); }
-    }
-    return;
-  }
   if (c.SEND && c.SEND >= c1 && c.SEND <= c2 && c.DECISION) {
     for (let r = Math.max(e.range.getRow(), HEADER_ROWS + 1); r <= e.range.getLastRow(); r++) {
       const box = sh.getRange(r, c.SEND);
@@ -174,25 +172,36 @@ function onDecisionEdit(e) {
 const DELETE_BOX = 'R2';
 const DELETED_TAB = 'Deleted Clips'; // hidden list so the robot never grabs a deleted clip again
 
-function deleteRejected() {
+function countRejected_() {
+  const sh = SpreadsheetApp.getActive().getSheetByName(PANEL);
+  const c = cols_(sh);
+  const n = sh.getLastRow() - HEADER_ROWS;
+  if (n <= 0 || !c.DECISION) return 0;
+  return sh.getRange(HEADER_ROWS + 1, c.DECISION, n, 1).getValues().filter(v => String(v[0]).trim() === 'Reject').length;
+}
+
+function deleteRejected() { deleteRejected_(false); }   // from the menu: asks with a popup
+
+function deleteRejected_(confirmed) {
   const ss = SpreadsheetApp.getActive();
   const sh = ss.getSheetByName(PANEL);
-  const ui = SpreadsheetApp.getUi();
+  const say = (t, m) => { if (confirmed) ss.toast(m, t, 8); else SpreadsheetApp.getUi().alert(t, m, SpreadsheetApp.getUi().ButtonSet.OK); };
   const c = cols_(sh);
   const last = sh.getLastRow();
-  if (last <= HEADER_ROWS || !c.DECISION) { ui.alert('No clips yet.'); return; }
+  if (last <= HEADER_ROWS || !c.DECISION) { say('🗑', 'No clips yet.'); return; }
   const n = sh.getLastColumn();
   const vals = sh.getRange(HEADER_ROWS + 1, 1, last - HEADER_ROWS, n).getValues();
   const forms = sh.getRange(HEADER_ROWS + 1, 1, last - HEADER_ROWS, n).getFormulas();
   const rows = [];
   vals.forEach((v, i) => { if (String(v[c.DECISION - 1]).trim() === 'Reject') rows.push(i); });
-  if (!rows.length) { ui.alert('Nothing to delete', 'There are no rejected clips.', ui.ButtonSet.OK); return; }
+  if (!rows.length) { say('Nothing to delete', 'There are no rejected clips.'); return; }
 
-  const ok = ui.alert('Are you sure?',
+  const ui = confirmed ? null : SpreadsheetApp.getUi();
+  const ok = confirmed ? 'YES' : ui.alert('Are you sure?',
     'Delete ' + rows.length + ' rejected clip' + (rows.length > 1 ? 's' : '') + '?\n\n' +
     'Their rows are removed from the Control Panel and their videos are deleted for good ' +
     '(frees Drive space within 30 minutes). This cannot be undone.', ui.ButtonSet.YES_NO);
-  if (ok !== ui.Button.YES) return;
+  if (!confirmed && ok !== ui.Button.YES) return;
 
   let log = ss.getSheetByName(DELETED_TAB);
   if (!log) {
@@ -215,8 +224,8 @@ function deleteRejected() {
   log.getRange(log.getLastRow() + 1, 1, logRows.length, 4).setValues(logRows);
   rows.slice().reverse().forEach(i => sh.deleteRow(HEADER_ROWS + 1 + i));
 
-  ui.alert('Done', 'Deleted ' + rows.length + ' rejected clip(s).' +
-    (failed.length ? '\n\nCould not trash the video for: ' + failed.join(', ') : ''), ui.ButtonSet.OK);
+  say('Done', 'Deleted ' + rows.length + ' rejected clip(s).' +
+    (failed.length ? ' Could not trash the video for: ' + failed.join(', ') : ''));
 }
 
 // ---- Robot timer: kicks the GitHub robots on a schedule (backup for GitHub's own timer) ----
@@ -372,34 +381,77 @@ function checkAlerts_() {
   }
 }
 
-// ---- Trim slider ----
-function trimSelected() {
-  const sh = SpreadsheetApp.getActive().getSheetByName(PANEL);
-  const r = sh.getActiveRange() ? sh.getActiveRange().getRow() : 0;
-  if (r <= HEADER_ROWS || !sh.getRange(r, 1).getValue()) { SpreadsheetApp.getUi().alert('Click a cell in a clip row first.'); return; }
-  openTrimmer_(r);
+// ---- Trim page (opens in a new tab from the ✂️ Trim link in each row) ----
+// One-time: Deploy > New deployment > Web app (Execute as: Me, Who has access: Anyone with Google account),
+// then 🎬 Clip Hub > ✂️ Connect trimmer.
+const LINK_CELL = "'Account Styles'!L1";
+
+function connectTrimmer() {
+  const ui = SpreadsheetApp.getUi();
+  let url = '';
+  try { url = ScriptApp.getService().getUrl() || ''; } catch (e) {}
+  const r = ui.prompt('Connect trimmer', 'Paste the Web app URL from Deploy > Manage deployments' +
+    (url ? '\n(found: ' + url + ' — leave empty to use it)' : ''), ui.ButtonSet.OK_CANCEL);
+  if (r.getSelectedButton() !== ui.Button.OK) return;
+  url = r.getResponseText().trim() || url;
+  if (!/^https:\/\/script\.google\.com\/.+\/exec$/.test(url)) { ui.alert('That is not a web app URL (it ends with /exec).'); return; }
+  SpreadsheetApp.getActive().getRange(LINK_CELL).setValue(url);
+  writeTrimLinks_();
+  ui.alert('Trimmer connected', 'Every clip row now has a ✂️ Trim link.', ui.ButtonSet.OK);
 }
 
-function openTrimmer_(r) {
+function writeTrimLinks_() {
   const sh = SpreadsheetApp.getActive().getSheetByName(PANEL);
   const c = cols_(sh);
-  const id = String(sh.getRange(r, c.ID).getValue());
+  const n = sh.getLastRow() - HEADER_ROWS;
+  if (!c.TRIM || n <= 0) return;
+  const ids = sh.getRange(HEADER_ROWS + 1, c.ID, n, 1).getValues();
+  sh.getRange(HEADER_ROWS + 1, c.TRIM, n, 1).setFormulas(ids.map((v, i) => [v[0] ? trimFormula_(HEADER_ROWS + 1 + i) : '']));
+}
+
+function trimFormula_(r) {
+  return '=IF($A' + r + '="","",HYPERLINK(' + LINK_CELL + '&"?id="&$A' + r + ',IF($' + colA1_(cols_(SpreadsheetApp.getActive().getSheetByName(PANEL)).CUT) + r + '="","✂️ Trim","✂️ "&$' + colA1_(cols_(SpreadsheetApp.getActive().getSheetByName(PANEL)).CUT) + r + ')))';
+}
+
+function colA1_(n) { let s = ''; while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); } return s; }
+
+function doGet(e) {
+  const me = (Session.getActiveUser().getEmail() || '').toLowerCase();
+  if (TEAM.map(x => x.toLowerCase()).indexOf(me) < 0) return HtmlService.createHtmlOutput('Not allowed for ' + (me || 'this account'));
+  const id = String((e && e.parameter && e.parameter.id) || '');
+  const sh = SpreadsheetApp.openById(SHEET_ID_()).getSheetByName(PANEL);
+  const c = cols_(sh);
+  const ids = sh.getRange(HEADER_ROWS + 1, c.ID, Math.max(sh.getLastRow() - HEADER_ROWS, 1), 1).getValues();
+  const i = ids.findIndex(v => String(v[0]) === id);
+  if (i < 0) return HtmlService.createHtmlOutput('Clip not found: ' + id);
+  const r = HEADER_ROWS + 1 + i;
   const fileId = c.RAWFILE ? extractId_(sh.getRange(r, c.RAWFILE)) : '';
-  if (!fileId) throw new Error('no video');
   const len = Number(c.LENGTH ? sh.getRange(r, c.LENGTH).getValue() : 0) || 60;
   const cut = c.CUT ? parseCut_(sh.getRange(r, c.CUT).getDisplayValue()) : null;
   const t = HtmlService.createTemplate(TRIM_HTML);
-  t.row = r; t.id = id; t.fileId = fileId; t.len = Math.min(len, 600);
+  t.id = id; t.fileId = fileId; t.len = Math.min(len, 600);
   t.a = cut && cut !== -1 ? cut[0] : 0;
   t.b = cut && cut !== -1 ? cut[1] : Math.min(len, 60);
-  SpreadsheetApp.getUi().showModelessDialog(t.evaluate().setWidth(560).setHeight(520), '✂️ Trim ' + id);
+  return t.evaluate().setTitle('✂️ Trim ' + id).addMetaTag('viewport', 'width=device-width, initial-scale=1');
 }
 
-function saveTrim(row, a, b) {
-  const sh = SpreadsheetApp.getActive().getSheetByName(PANEL);
+function SHEET_ID_() {
+  const p = PropertiesService.getScriptProperties();
+  let id = p.getProperty('SHEET_ID');
+  if (!id) { id = SpreadsheetApp.getActive().getId(); p.setProperty('SHEET_ID', id); }
+  return id;
+}
+
+function saveTrim(id, a, b) {
+  const sh = SpreadsheetApp.openById(SHEET_ID_()).getSheetByName(PANEL);
   const c = cols_(sh);
-  const full = a <= 0.05 && b >= Number(sh.getRange(row, c.LENGTH).getValue() || 0) - 0.05;
-  sh.getRange(row, c.CUT).setValue(full ? '' : "'" + mmss_(a) + '-' + mmss_(b));
+  const ids = sh.getRange(HEADER_ROWS + 1, c.ID, Math.max(sh.getLastRow() - HEADER_ROWS, 1), 1).getValues();
+  const i = ids.findIndex(v => String(v[0]) === id);
+  if (i < 0) throw new Error('clip not found');
+  const r = HEADER_ROWS + 1 + i;
+  const len = Number(sh.getRange(r, c.LENGTH).getValue() || 0);
+  const full = a <= 0.05 && b >= len - 0.05;
+  sh.getRange(r, c.CUT).setValue(full ? '' : "'" + mmss_(a) + '-' + mmss_(b));
   return full ? 'Full clip' : mmss_(a) + '-' + mmss_(b);
 }
 
@@ -421,7 +473,8 @@ function parseCut_(v) {
 
 const TRIM_HTML = `
 <style>
- body{font-family:Arial,sans-serif;margin:10px;background:#111;color:#eee}
+ body{font-family:Arial,sans-serif;margin:10px auto;max-width:620px;background:#111;color:#eee}
+ h3{margin:4px 0 10px}
  iframe{width:100%;height:290px;border:0;border-radius:8px;background:#000}
  .wrap{position:relative;height:36px;margin:18px 4px 6px}
  .wrap input{position:absolute;left:0;width:100%;pointer-events:none;-webkit-appearance:none;background:none;top:8px}
@@ -432,6 +485,7 @@ const TRIM_HTML = `
  button{margin-top:14px;width:100%;padding:12px;font-size:16px;font-weight:bold;border:0;border-radius:8px;background:#22c55e;color:#fff;cursor:pointer}
  .hint{font-size:12px;color:#aaa;margin-top:6px}
 </style>
+<h3>✂️ <?= id ?></h3>
 <iframe src="https://drive.google.com/file/d/<?= fileId ?>/preview" allow="autoplay"></iframe>
 <div class="wrap"><div class="track"></div><div class="sel" id="sel"></div>
  <input type="range" id="a" min="0" max="<?= len ?>" step="0.5" value="<?= a ?>">
@@ -451,8 +505,8 @@ const TRIM_HTML = `
   ta.textContent=f(a);tb.textContent=f(b);tl.textContent=(b-a).toFixed(1)+'s';}
  A.oninput=upd;B.oninput=upd;upd();
  document.getElementById('save').onclick=function(){this.textContent='Saving…';
-  google.script.run.withSuccessHandler(t=>{this.textContent='✅ Saved: '+t;setTimeout(()=>google.script.host.close(),900)})
-   .saveTrim(<?= row ?>,+A.value,+B.value);};
+  google.script.run.withSuccessHandler(t=>{this.textContent='✅ Saved: '+t;this.textContent='✅ Saved: '+t+' (you can close this tab)'})
+   .saveTrim('<?= id ?>',+A.value,+B.value);};
 </script>`;
 
 // '0:05' / '5' / '1:02' -> seconds; '' -> null; junk -> -1

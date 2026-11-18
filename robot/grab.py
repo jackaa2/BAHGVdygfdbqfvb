@@ -18,6 +18,14 @@ from sources import Twitch, kick_clips, slug_from_link
 ET = ZoneInfo("America/New_York")
 
 
+def col_a1(i):  # 0-based -> A1 letters
+    s, i = "", i + 1
+    while i:
+        i, r = divmod(i - 1, 26)
+        s = chr(65 + r) + s
+    return s
+
+
 def clip_key(url):
     """Same clip, any URL style -> one key (twitch.tv/x/clip/ID, clips.twitch.tv/ID, kick ?clip=ID)."""
     m = re.search(r"(?:/clip/|clips\.twitch\.tv/|[?&]clip=|/clips/)([-\w]+)", url or "")
@@ -266,10 +274,15 @@ def main():
                     "Platform": c["platform"], "Grabbed (ET)": now_et.strftime("%Y-%m-%d %H:%M"),
                     "Raw File": drive_link, "Notes": "🧪 TEST clip (not GTA 6)" if test else ""}
             row = [vals.get(h, "") for h in header]
+            if "✂️ TRIM" in header and "✂️ CUT" in header:  # ✂️ Trim link -> trim page (web app URL in Account Styles!L1)
+                cut = col_a1(hcol("✂️ CUT"))
+                row[hcol("✂️ TRIM")] = (f"=IF($A{{r}}=\"\",\"\",HYPERLINK('Account Styles'!L1&\"?id=\"&$A{{r}},"
+                                       f"IF(${cut}{{r}}=\"\",\"✂️ Trim\",\"✂️ \"&${cut}{{r}})))")
             try:
                 ids = g.get_values(sheet, f"'{C.PANEL_TAB}'!A{C.HEADER_ROWS + 1}:A")  # re-check: rows may have moved
                 last = max([i for i, r in enumerate(ids) if r and str(r[0]).strip()], default=-1)
                 next_row = C.HEADER_ROWS + 1 + last + 1
+                row = [x.replace("{r}", str(next_row)) if isinstance(x, str) else x for x in row]
                 g.update_values(sheet, f"'{C.PANEL_TAB}'!A{next_row}", [row])
                 grabbed += 1
                 try:  # Approve/Reject dropdown only on rows that have a clip
@@ -283,10 +296,7 @@ def main():
                         {"setDataValidation": {
                         "range": {"sheetId": gid, "startRowIndex": next_row - 1, "endRowIndex": next_row,
                                   "startColumnIndex": hcol("🚀 SEND"), "endColumnIndex": hcol("🚀 SEND") + 1},
-                        "rule": {"condition": {"type": "BOOLEAN"}}}}] + ([{"setDataValidation": {
-                        "range": {"sheetId": gid, "startRowIndex": next_row - 1, "endRowIndex": next_row,
-                                  "startColumnIndex": hcol("✂️ TRIM"), "endColumnIndex": hcol("✂️ TRIM") + 1},
-                        "rule": {"condition": {"type": "BOOLEAN"}}}}] if "✂️ TRIM" in header else []))
+                        "rule": {"condition": {"type": "BOOLEAN"}}}}])
                 except Exception as e:
                     errors.append(f"{clip_id}: dropdown: {e}")
             except Exception as e:
