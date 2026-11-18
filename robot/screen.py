@@ -1,5 +1,5 @@
 """Claude hook writer: for every new clip without hooks, Claude looks at 4 frames + reads what's said and
-writes 3 hooks (Hook 1-3). The 🎯 TOP TEXT cell gets a dropdown of those 3 (+ "(no top text)");
+writes 5 hooks (Hook 1-5, one per YouTube channel). The 🎯 TOP TEXT cell gets a dropdown of those 3 (+ "(no top text)");
 you pick one before you can approve."""
 import base64
 import json
@@ -18,8 +18,9 @@ from google_api import Google
 API = "https://api.anthropic.com/v1/messages"
 MODELS = ["claude-haiku-5-5", "claude-sonnet-5-5"]   # fast + cheap first, fallback second
 MAX_PER_RUN = 25
+AUTO_TAG = "🤖 AUTO"     # Notes start with this on clips the robot picked by itself
 
-PROMPT = """You screen clips for a faceless GTA 6 streamer-clips channel (TikTok, YouTube Shorts, Reels, X).
+PROMPT = """You screen clips for a group of faceless GTA 6 streamer-clips YouTube Shorts channels.
 The best posts are funny, shocking or hype streamer moments, ideally about GTA 6, that hook in the first second.
 
 Clip info:
@@ -32,13 +33,18 @@ Clip info:
 The images are 4 frames from the clip, in order.
 
 Reply with ONLY this JSON, nothing else:
-{{"hooks": ["<hook 1>", "<hook 2>", "<hook 3>"]}}
+{{"postable": true, "reason": "<max 12 words>", "hooks": ["<1>", "<2>", "<3>", "<4>", "<5>"]}}
 
-Hook rules: 3 different on-screen top lines for the post, each max 45 characters, punchy, curiosity or
-reaction style (e.g. "Kai was NOT ready for this 😭", "Speed broke the game in 5 seconds"), use the streamer's
-name when it helps, no hashtags, no quotes, nothing false about what happens in the clip.
-Make the 3 hooks different angles (reaction, curiosity, bold claim). End ONE or two of the hooks with
-one fitting emoji (like 😭 💀 😂 🔥 😳 🤯); leave the others without emoji. Keep them clean: nothing hateful or sexual."""
+"postable": false if the clip is not worth posting: nothing happens (loading screens, menus, dead air, AFK),
+it isn't a streamer moment, it's mostly non-English, it's unwatchable, or it's mainly hateful / sexual content.
+Otherwise true. "reason": why, in a few words.
+
+Hook rules: 5 DIFFERENT on-screen top lines (each one goes on a different channel, so no two may be
+near-copies), each max 45 characters, punchy, curiosity or reaction style (e.g. "Kai was NOT ready for this 😭",
+"Speed broke the game in 5 seconds"), use the streamer's name when it helps, no hashtags, no quotes, nothing
+false about what happens in the clip. Use 5 different angles (reaction, curiosity, bold claim, question,
+chat/hype). End two or three of them with one fitting emoji (like 😭 💀 😂 🔥 😳 🤯); leave the rest without.
+Keep them clean: nothing hateful or sexual."""
 
 
 def frames(path, tmp, n=4):
@@ -124,7 +130,8 @@ def main():
             "decision": "✅ YOUR DECISION", "notes": "Notes",
             "views": "Views",
             "secs": "Length (s)", "platform": "Platform", "raw": "Raw File",
-            "h1": "Hook 1", "h2": "Hook 2", "h3": "Hook 3"}
+            "h1": "Hook 1", "h2": "Hook 2", "h3": "Hook 3", "h4": "Hook 4", "h5": "Hook 5",
+            "status": "Status", "send": "🚀 SEND"}
     col = {k: head.index(v) for k, v in need.items() if v in head}
     missing = [need[k] for k in need if k not in col]
     if missing:
@@ -139,7 +146,7 @@ def main():
             and not (cell(r, "h1") or cell(r, "h2") or cell(r, "h3")) and not cell(r, "top")][:MAX_PER_RUN]
     gid = g.sheet_gid(sheet, C.PANEL_TAB)
     print(f"{len(todo)} clip(s) to screen")
-    done = 0
+    done = sent = 0
     with tempfile.TemporaryDirectory() as tmp:
         for r in todo:
             clip_id = cell(r, "id")
@@ -163,8 +170,10 @@ def main():
                                            seconds=cell(r, "secs"),
                                            transcript="(left out - go by the frames and title; keep hooks clean)")
                     res = ask_claude(key, prompt, imgs)
-                hooks = [re.sub(r'["#]', "", str(h)).strip()[:60] for h in (res.get("hooks") or [])][:3]
+                hooks = [re.sub(r'["#]', "", str(h)).strip()[:60] for h in (res.get("hooks") or [])][:5]
                 hooks = [h for h in hooks if h]
+                auto = cell(r, "notes").startswith(AUTO_TAG)
+                postable = res.get("postable", True) is not False
                 if not hooks:
                     raise RuntimeError("Claude returned no hooks")
                 # find the row again right before writing (rows can move)
@@ -173,8 +182,16 @@ def main():
                 if not hit:
                     continue
                 rn = hit[0]
-                g.update_values(sheet, f"'{C.PANEL_TAB}'!{col_letter(col['h1'])}{rn}:"
-                                       f"{col_letter(col['h3'])}{rn}", [hooks + [""] * (3 - len(hooks))])
+                put = lambda k, v: g.update_values(sheet, f"'{C.PANEL_TAB}'!{col_letter(col[k])}{rn}", [[v]])
+                if auto and not postable:
+                    # Claude passed on this auto-pick: reject it (the next grab picks another one)
+                    put("decision", "Reject")
+                    put("notes", f"{AUTO_TAG} skipped: {str(res.get('reason') or '')[:80]}")
+                    print(f"{clip_id}: auto-pick skipped ({res.get('reason')})")
+                    done += 1
+                    continue
+                for i, h in enumerate(hooks + [""] * (5 - len(hooks))):
+                    put(f"h{i + 1}", h)
                 # dropdown in 🎯 TOP TEXT with these hooks (typing your own text is allowed too)
                 g.batch_update(sheet, [{"setDataValidation": {
                     "range": {"sheetId": gid, "startRowIndex": rn - 1, "endRowIndex": rn,
@@ -182,7 +199,12 @@ def main():
                     "rule": {"condition": {"type": "ONE_OF_LIST", "values": [
                         {"userEnteredValue": h} for h in hooks + ["(no top text)"]]},
                         "showCustomUi": True, "strict": False}}}])
-                print(f"{clip_id}: {hooks}")
+                if auto:  # no human step: channel 1 gets hook 1, the others get hooks 2-5; send to editing
+                    put("top", hooks[0])
+                    put("send", True)
+                    put("status", "Pending")
+                    sent += 1
+                print(f"{clip_id}: {'AUTO ' if auto else ''}{hooks}")
                 done += 1
                 os.remove(path)
             except Exception as e:
@@ -197,6 +219,9 @@ def main():
                 except Exception:
                     pass
     print(f"Wrote hooks for {done} clip(s)")
+    if sent and os.environ.get("GITHUB_OUTPUT"):
+        with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+            f.write(f"auto_sent={sent}\n")
 
 
 if __name__ == "__main__":

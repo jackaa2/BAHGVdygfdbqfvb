@@ -27,7 +27,7 @@ if PREVIEWS:
 NEEDED = {"id": "Clip ID", "decision": "✅ YOUR DECISION", "status": "Status", "raw": "Raw File",
           "edited": "Edited Files", "notes": "Notes", "h1": "Hook 1", "h2": "Hook 2", "h3": "Hook 3",
           "streamer": "Streamer", "platform": "Platform", "title": "Clip Title", "top": "🎯 TOP TEXT", "send": "🚀 SEND"}
-OPTIONAL = {"cut": "✂️ CUT"}
+OPTIONAL = {"cut": "✂️ CUT", "h4": "Hook 4", "h5": "Hook 5"}
 
 
 def col_letter(i):  # 0-based -> A1 letter
@@ -217,20 +217,22 @@ def main():
                     window, clip_len = a0, min(b0 - a0, C.MAX_CLIP_SECONDS)
                 else:
                     window, clip_len = best_window(words, dur, C.MAX_CLIP_SECONDS), C.MAX_CLIP_SECONDS
-                hooks = {1: cell(r, "h1"), 2: cell(r, "h2"), 3: cell(r, "h3")}
                 made = 0
+                per_channel = channel_hooks(cell(r, "top"), [cell(r, k) for k in ("h1", "h2", "h3", "h4", "h5")])
 
-                # YouTube A1-A5 + TikTok T1-T5 (TikTok N = YouTube N, only the watermark differs)
+                # YouTube channels 1-5 (each with its own hook so no two channels post the same video)
                 from render import WM_DIR
                 jobs = [(a, f"A{a}", C.ACCOUNT_FOLDERS[a], f"{clip_id}_A{a}.mp4") for a in sorted(C.CHANNELS)]
-                jobs += [(t, f"T{t}", C.TIKTOK_FOLDERS[t], f"{clip_id}_TT{t}.mp4") for t in sorted(C.TIKTOK_FOLDERS)
-                         if os.path.exists(os.path.join(WM_DIR, f"T{t}.png"))]
+                if getattr(C, "MAKE_TIKTOK", False):
+                    jobs += [(t, f"T{t}", C.TIKTOK_FOLDERS[t], f"{clip_id}_TT{t}.mp4") for t in sorted(C.TIKTOK_FOLDERS)
+                             if os.path.exists(os.path.join(WM_DIR, f"T{t}.png"))]
 
                 def one(job):
                     a, wm_name, folder, name = job
                     st_ = accts[a]
                     out = os.path.join(tmp, name)
-                    render(src, out, a, words, static_caption(cell(r, "top"), "") if C.SHOW_HOOK else "", "#FFFFFF",
+                    hook_text = per_channel.get(a, cell(r, "top")) if wm_name.startswith("A") else cell(r, "top")
+                    render(src, out, a, words, static_caption(hook_text, "") if C.SHOW_HOOK else "", "#FFFFFF",
                            hook_font, st_["handle"] if C.SHOW_WATERMARK else "", st_["spot"], st_["zoom"],
                            window if manual else min(window + st_["trim"], max(dur - 3, 0)), tmp,
                            platform=cell(r, "platform") or "Twitch", streamer=cell(r, "streamer"),
@@ -287,6 +289,22 @@ def describe(path):
                         "stream=index,codec_type,codec_name,width,height,r_frame_rate,avg_frame_rate,start_time,duration,nb_frames,time_base:format=start_time,duration,size",
                         "-of", "compact=p=0:nk=0", path], capture_output=True, text=True)
     return " || ".join(r.stdout.split("\n")).strip()
+
+
+def channel_hooks(top, hooks):
+    """Channel 1 gets the TOP TEXT you picked; channels 2-5 each get a different one of Claude's other hooks."""
+    top = (top or "").strip()
+    if not top or top == "(no top text)" or top.startswith("⚠️ Claude"):
+        return {a: "" for a in range(1, 7)}
+    rest = []
+    for h in hooks:
+        h = (h or "").strip()
+        if h and not h.startswith("(") and not h.startswith("⚠️") and h != top and h not in rest:
+            rest.append(h)
+    out = {1: top}
+    for a in range(2, 7):
+        out[a] = rest[a - 2] if len(rest) >= a - 1 else top
+    return out
 
 
 def make_sample(g, sheet, rows, cell, clip_id):

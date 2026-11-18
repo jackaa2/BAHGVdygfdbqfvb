@@ -7,6 +7,10 @@ concurrency:
   group: hooks
   cancel-in-progress: false
 
+permissions:
+  contents: read
+  actions: write
+
 jobs:
   hooks:
     runs-on: ubuntu-latest
@@ -30,7 +34,8 @@ jobs:
           fi
           ffmpeg -hide_banner -filters 2>/dev/null | grep -q " ass " && echo "ffmpeg ok (with captions)"
           pip install -q requests faster-whisper numpy
-      - name: Claude writes 3 hooks per approved clip
+      - name: Claude writes 5 hooks per approved clip
+        id: hooks
         working-directory: robot
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -39,3 +44,8 @@ jobs:
           GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
           SHEET_ID: ${{ secrets.SHEET_ID }}
         run: python screen.py
+      - name: Start editing the auto-picked clips
+        if: steps.hooks.outputs.auto_sent != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run edit.yml -R ${{ github.repository }}

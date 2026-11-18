@@ -100,3 +100,12 @@ NO_HOOK_TEXT = "⚠️ Claude couldn't write a hook - type your own here"
 ONLY_TIERS = {1, 2, 3}
 # ...except a GTA 6 clip from ANY streamer gets in once it's this popular (it still sorts after T1/T2)
 POPULAR_ANY_VIEWS = 250   # any streamer's GTA 6 clip gets in at 250+ views (sorted after T1-T3); None = tiers only
+
+# TikTok is off: only the 5 YouTube channels get videos (TikTok folders are left alone)
+MAKE_TIKTOK = False
+
+# 🤖 Auto-pick: every 6 hours the robot approves the 10 most-viewed new clips by itself; Claude screens them,
+# writes 5 hooks (one per channel) and sends them to editing. You can still approve clips by hand too.
+AUTO_PICK = True
+AUTO_PICKS_PER_WINDOW = 10
+AUTO_WINDOW_HOURS = 6

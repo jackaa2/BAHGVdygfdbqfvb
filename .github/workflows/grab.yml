@@ -30,6 +30,10 @@ on:
         required: false
         default: "5"
 
+permissions:
+  contents: read
+  actions: write
+
 concurrency:
   group: grab
   cancel-in-progress: false
@@ -56,6 +60,7 @@ jobs:
           fi
           ffmpeg -version | head -1
       - name: Grab clips
+        id: grab
         working-directory: robot
         env:
           TWITCH_CLIENT_ID: ${{ secrets.TWITCH_CLIENT_ID }}
@@ -71,3 +76,8 @@ jobs:
           PURGE_IDS: ${{ inputs.purge_ids }}
           FIX_RAW: ${{ inputs.fix_raw }}
         run: python grab.py
+      - name: Start Claude on the auto-picked clips
+        if: steps.grab.outputs.auto_picked != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run hooks.yml -R ${{ github.repository }}

@@ -89,6 +89,60 @@ def cleanup(g, now_et):
     return n
 
 
+AUTO_TAG = "🤖 AUTO"
+
+
+def auto_pick(g, sheet, now_et):
+    """Every 6 hours (12am, 6am, 12pm, 6pm ET) the robot approves the most-viewed undecided clips grabbed in
+    the last 6 hours, up to AUTO_PICKS_PER_WINDOW. Claude then screens each one (skips duds) and writes the
+    5 channel hooks; skipped ones get replaced on the next grab."""
+    hours = C.AUTO_WINDOW_HOURS
+    start = now_et.replace(hour=now_et.hour - now_et.hour % hours, minute=0, second=0, microsecond=0)
+    tag = f"{AUTO_TAG} {start:%m/%d %-I%p}"
+    head = [str(h).strip() for h in g.get_values(sheet, f"'{C.PANEL_TAB}'!A{C.HEADER_ROWS}:Z{C.HEADER_ROWS}")[0]]
+    need = {"id": "Clip ID", "dec": "✅ YOUR DECISION", "notes": "Notes", "views": "Views",
+            "grabbed": "Grabbed (ET)", "status": "Status", "top": "🎯 TOP TEXT"}
+    if any(v not in head for v in need.values()):
+        return 0
+    ci = {k: head.index(v) for k, v in need.items()}
+    rows = g.get_values(sheet, f"'{C.PANEL_TAB}'!A{C.HEADER_ROWS + 1}:Z", formulas=True)
+    cell = lambda r, k: str(r[ci[k]]).strip() if len(r) > ci[k] else ""
+    taken = sum(1 for r in rows if cell(r, "notes").startswith(tag) and cell(r, "dec") != "Reject")
+    want = C.AUTO_PICKS_PER_WINDOW - taken
+    if want <= 0:
+        return 0
+    since = now_et - dt.timedelta(hours=hours)
+
+    def grabbed_at(v):
+        try:   # the sheet keeps dates as day numbers since 1899-12-30
+            return (dt.datetime(1899, 12, 30) + dt.timedelta(days=float(v))).replace(tzinfo=ET)
+        except ValueError:
+            try:
+                return dt.datetime.strptime(v[:16], "%Y-%m-%d %H:%M").replace(tzinfo=ET)
+            except ValueError:
+                return None
+
+    def views(r):
+        try:
+            return float(str(cell(r, "views")).replace(",", ""))
+        except ValueError:
+            return 0
+
+    cands = []
+    for i, r in enumerate(rows):
+        if not cell(r, "id") or cell(r, "dec") or cell(r, "notes") or cell(r, "top") or cell(r, "status") != "New":
+            continue
+        t = grabbed_at(cell(r, "grabbed"))
+        if t and t >= since:
+            cands.append((views(r), i))
+    picks = [i for _, i in sorted(cands, reverse=True)[:want]]
+    for i in picks:
+        rn = C.HEADER_ROWS + 1 + i
+        for k, v in (("dec", "Approve"), ("status", "Waiting for Hook"), ("notes", tag)):
+            g.update_values(sheet, f"'{C.PANEL_TAB}'!{col_a1(ci[k])}{rn}", [[v]])
+    return len(picks)
+
+
 def cleanup_rows(g, sheet, now_et):
     """Same ages as the Drive clean-up: rejected 1 day, never decided 3 days, everything else 7 days.
     Age comes from the clip ID (MMDD-...)."""
@@ -425,6 +479,18 @@ def main():
             print(f"Clean-up: deleted {removed} old file(s)")
     except Exception as e:
         errors.append(f"clean-up: {e}")
+
+    # --- Auto-pick: the 10 most-viewed new clips of each 6-hour window go straight to Claude + editing ---
+    if getattr(C, "AUTO_PICK", False) and not test:
+        try:
+            n = auto_pick(g, sheet, now_et)
+            if n:
+                print(f"Auto-pick: approved {n} clip(s) for Claude to screen")
+                if os.environ.get("GITHUB_OUTPUT"):
+                    with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+                        f.write(f"auto_picked={n}\n")
+        except Exception as e:
+            errors.append(f"auto-pick: {e}")
 
     # --- Sheet clean-up: drop rows whose videos the clean-up has removed, so the sheet stays fast forever ---
     try:
