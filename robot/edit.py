@@ -141,7 +141,7 @@ def main():
                     s = accts[a]
                     out = os.path.join(tmp, f"{clip_id}_A{a}.mp4")
                     render(src, out, a, words, hooks[HOOK_FOR[a]] if C.SHOW_HOOK else "", s["hook_color"], hook_font,
-                           s["handle"], s["spot"], s["zoom"], s["trim"], tmp)
+                           s["handle"] if C.SHOW_WATERMARK else "", s["spot"], s["zoom"], s["trim"], tmp)
                     # replace an older version with the same name (re-edits)
                     old = g.find_child(C.ACCOUNT_FOLDERS[a], f"{clip_id}_A{a}.mp4", folder=False)
                     if old:

@@ -46,3 +46,4 @@ EDIT_MAX_PER_RUN = 6          # approved clips turned into 6 versions per run
 WHISPER_MODEL = "small.en"    # speech-to-text for captions (free, runs on GitHub)
 
 SHOW_HOOK = False             # hook text on top of the video (off: captions only)
+SHOW_WATERMARK = False        # turn on once the 6 channel watermarks are in
