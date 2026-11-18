@@ -171,6 +171,16 @@ def main():
                         g.upload(out, f"{clip_id}_A{a}.mp4", C.ACCOUNT_FOLDERS[a])
                         os.remove(out)
                         made += 1
+                if PREVIEWS and os.environ.get("PREVIEW_UPLOAD") == "yes":
+                    try:
+                        sheet_img = os.path.join(PREVIEWS, f"{clip_id}_preview.jpg")
+                        ins = sum([["-i", os.path.join(PREVIEWS, f"{clip_id}_A{a}.jpg")] for a in range(1, 7)], [])
+                        subprocess.run(["ffmpeg", "-v", "error", "-y", *ins, "-filter_complex", "hstack=6",
+                                        sheet_img], check=True)
+                        pv = g.ensure_folder(C.ROOT_FOLDER[0], "_previews (test)")
+                        g.upload(sheet_img, f"{clip_id}_preview.jpg", pv, mime="image/jpeg")
+                    except Exception as e:
+                        print(f"preview upload failed: {e}")
                 put(rownum, "edited", '=HYPERLINK("https://drive.google.com/drive/folders/'
                     f'{C.FOLDERS["ready"][0]}","✅ 6 versions")', clip_id)
                 put(rownum, "status", "Ready to Post", clip_id)

@@ -3,7 +3,12 @@ name: Make channel versions (captions + watermark)
 on:
   schedule:
     - cron: "3,13,23,33,43,53 * * * *"   # every 10 min
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      preview:
+        description: "TEST: also upload a preview image of the 6 versions to Drive (_previews)"
+        required: false
+        default: "no"
 
 concurrency:
   group: edit
@@ -35,6 +40,7 @@ jobs:
           GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
           SHEET_ID: ${{ secrets.SHEET_ID }}
           PREVIEW_DIR: ${{ github.workspace }}/previews
+          PREVIEW_UPLOAD: ${{ inputs.preview }}
         run: python edit.py
       - name: Save preview frames (for checking the look)
         if: always()
