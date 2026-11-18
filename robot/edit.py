@@ -302,7 +302,12 @@ def make_sample(g, sheet, rows, cell, clip_id):
         render(src, out, 1, words, static_caption(top, ""), "#FFFFFF", hook_font, "", st_["spot"], st_["zoom"],
                best_window(words, dur, C.MAX_CLIP_SECONDS), tmp, platform=cell(r, "platform") or "Twitch",
                streamer=cell(r, "streamer"), max_len=C.MAX_CLIP_SECONDS, wm_name="A1", bell=True)
-        print(f"sample made: {out}")
+        pv = g.ensure_folder(C.ROOT_FOLDER[0], "_previews (test)")
+        old = g.find_child(pv, os.path.basename(out), folder=False)
+        if old:
+            g.trash(old)
+        fid = g.upload(out, os.path.basename(out), pv)
+        print(f"sample made: https://drive.google.com/file/d/{fid}/view")
 
 
 REQUIRED = ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_REFRESH_TOKEN", "SHEET_ID"]
