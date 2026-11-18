@@ -319,7 +319,7 @@ def main():
         if c.get("tracked") and not is_gta(c, gta):
             why["not GTA 6"] += 1; continue
         if (C.ONLY_TIERS and not test and tier_of.get(norm(c["streamer"])) not in C.ONLY_TIERS
-                and c["views"] < getattr(C, "POPULAR_ANY_VIEWS", 10 ** 9)):
+                and c["views"] < (getattr(C, "POPULAR_ANY_VIEWS", None) or 10 ** 9)):
             why["not T1/T2"] = why.get("not T1/T2", 0) + 1; continue
         if clip_key(c["url"]) in known or clip_key(c["url"]) in seen:
             why["already have"] += 1; continue

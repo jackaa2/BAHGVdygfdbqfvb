@@ -99,4 +99,4 @@ NO_HOOK_TEXT = "⚠️ Claude couldn't write a hook - type your own here"
 # Only grab clips from these tiers on the Streamers + Links tab (T1, T2). Set to None to allow everyone again.
 ONLY_TIERS = {1, 2}
 # ...except a GTA 6 clip from ANY streamer gets in once it's this popular (it still sorts after T1/T2)
-POPULAR_ANY_VIEWS = 1000
+POPULAR_ANY_VIEWS = None  # off: T1/T2 only for now (set to 1000 to let popular clips from anyone in)
