@@ -76,6 +76,26 @@ def set_panel(g, sheet, head, rows, clip_id, values):
     return False
 
 
+def title_and_tags(hook, streamer, clip_id):
+    """Title = the hook on that video + as many trending tags as fit in YouTube's 100 characters.
+    Tags rotate per video (picked from TAG_BANK) so every post isn't identical."""
+    import random
+    rnd = random.Random(clip_id)               # same clip -> same tags if it's ever re-sent
+    bank = [t if t.startswith("#") else "#" + t for t in (C.TAG_BANK or []) if t.strip()]
+    core = [t for t in ("#GTA6", "#shorts") if t]
+    extra = [t for t in bank if t.lower() not in {c.lower() for c in core}]
+    rnd.shuffle(extra)
+    title = hook.strip()[:100]
+    for t in core + extra:
+        if len(title) + 1 + len(t) <= 95:   # a little under 100: emojis can count double
+            title += " " + t
+    streamer_tag = "#" + "".join(ch for ch in streamer if ch.isalnum())
+    desc_tags = " ".join(dict.fromkeys(core + [streamer_tag] + extra[:15]))
+    desc = f"🎥 {streamer} live on stream\n\n{desc_tags}"
+    yt_tags = ",".join(t.lstrip("#") for t in dict.fromkeys(core + [streamer_tag] + extra))[:480]
+    return title, desc, yt_tags
+
+
 def redo_clip(g, sheet, head, rows, clip_id, file_id):
     """👎 clip: back for new hooks + a new video (it shows up again in a later batch)."""
     set_panel(g, sheet, head, rows, clip_id, {
@@ -183,12 +203,12 @@ def make_batch(g, sheet, review, now):
              else "reel failed - use the ▶ watch links")
     header = [f"BATCH {bid}", "", f"🎬 BATCH {now:%a %-I:%M %p} · {len(loose)} clips", watch, "", "",
               False, "", now.strftime("%Y-%m-%d %H:%M"),
-              "👀 Watch the reel · 👎 any bad ones · then tick ✅ POST ALL", "", reel_fid, bid]
+              "👀 Watch the reel · 👎 bad ones · tick ✅ on this row to POST ALL", "", reel_fid, bid]
     clips = []
     for n, i in enumerate(loose, 1):
         r = list(review[i])
         r[R_NAME] = f"#{n} · Ch{r[R_CH]} · {C.CHANNELS.get(int(r[R_CH]), '')}"
-        r[R_POST], r[R_BAD], r[R_BATCH], r[R_STATUS] = False, False, bid, "👀 In the reel above"
+        r[R_POST], r[R_BAD], r[R_BATCH], r[R_STATUS] = False, ticked(r[R_BAD]), bid, "👀 In the reel above"
         clips.append(r)
     delete_rows(g, sheet, loose)
     where = g.append_rows(sheet, f"'{C.REVIEW_TAB}'!A{C.REVIEW_HEADER_ROW}:M", [header] + clips)
@@ -297,14 +317,14 @@ def main():
                         break
                     slot = next_slot(a, max(clash) + spread)
                 hook = str(r[R_HOOK]).strip() or f"{r[R_STREAMER]} in GTA 6"
+                title, desc, tags = title_and_tags(hook, str(r[R_STREAMER]).strip(), clip_id)
                 try:
                     path = g.download(str(r[R_FILE]).strip(), os.path.join(tmp, f"{clip_id}_A{a}.mp4"))
                     with open(path, "rb") as f:
                         resp = requests.post(API, headers={"Authorization": f"Apikey {key}",
                                                            "Idempotency-Key": f"{clip_id}-A{a}-{r[R_FILE]}"},
                                              data={"user": user, "platform[]": "youtube",
-                                                   "title": (hook + " #shorts")[:100],
-                                                   "description": f"🎥 {r[R_STREAMER]} live on stream\n{C.POST_HASHTAGS}",
+                                                   "title": title, "description": desc, "tags": tags,
                                                    "privacyStatus": C.POST_PRIVACY,
                                                    "scheduled_date": slot.strftime("%Y-%m-%dT%H:%M:00"),
                                                    "timezone": "America/New_York"},

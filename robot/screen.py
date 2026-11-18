@@ -19,6 +19,7 @@ API = "https://api.anthropic.com/v1/messages"
 MODELS = ["claude-haiku-5-5", "claude-sonnet-5-5"]   # fast + cheap first, fallback second
 MAX_PER_RUN = 25
 AUTO_TAG = "🤖 AUTO"
+LEARNED = ""
 # $ per million tokens (input, output) - for the credit counter on the Analytics tab
 PRICES = {"claude-haiku-5-5": (0.10, 0.50), "claude-sonnet-5-5": (2.00, 10.00)}
 SPENT = {"usd": 0.0}
@@ -44,12 +45,44 @@ no GTA 6 on screen or being discussed), nothing happens (loading screens, menus,
 it isn't a streamer moment, it's mostly non-English, it's unwatchable, or it's mainly hateful / sexual content.
 Otherwise true. "reason": why, in a few words.
 
-Hook rules: 5 DIFFERENT on-screen top lines (each one goes on a different channel, so no two may be
-near-copies), each max 45 characters, punchy, curiosity or reaction style (e.g. "Kai was NOT ready for this 😭",
-"Speed broke the game in 5 seconds"), use the streamer's name when it helps, no hashtags, no quotes, nothing
-false about what happens in the clip, no timestamps, never name a different game. Use 5 different angles (reaction, curiosity, bold claim, question,
-chat/hype). End two or three of them with one fitting emoji (like 😭 💀 😂 🔥 😳 🤯); leave the rest without.
-Keep them clean: nothing hateful or sexual."""
+Hooks = the caption on top of the Short AND its YouTube title. Write like a funny clip-page admin, not an AI:
+short, casual, roasting the streamer (lovingly), the way trending Shorts captions talk. 5 DIFFERENT ones
+(each goes on a different channel, no near-copies), each max 45 characters.
+Good style (don't copy, match the energy):
+  "bro thought he was in fast and furious 💀"   "speed has 0 brain cells today"
+  "xqc said 'trust me' and then this happened"  "kai's driving should be illegal"
+  "the NPC cooked him 😭"                        "lacy fumbled the easiest heist ever"
+  "nah this man is NOT okay"                    "pov: you let adin drive"
+Rules: mostly lowercase is fine; slang ok (bro, nah, ts, cooked, fumbled, pov:, lowkey); roast the streamer or
+the moment; it must match what actually happens in the clip; use the streamer's name in at least 2 of them.
+NEVER use these AI-sounding phrases: "pure chaos", "is everything", "absolutely", "unhinged", "wild ride",
+"you won't believe", "insane moment", "wait for it", "Chat, did you", "Why is X ...?" questions, colons
+like "X: Y", em dashes. No hashtags, no quotes around the whole line, no timestamps, never name another game.
+End one or two of them with ONE emoji (💀 😭 😂 🔥 🫠 🤦); the rest no emoji.
+Keep them clean: nothing hateful or sexual.{learned}"""
+
+
+def learned_style(g, sheet):
+    """What's worked on OUR channels so far (📒 Posts: hook + views) -> fed back into the prompt so Claude
+    leans toward the hook styles that get views. Needs at least 10 posts with views."""
+    try:
+        rows = g.get_values(sheet, f"'{C.POSTS_TAB}'!G2:J") or []
+    except Exception:
+        return ""
+    scored = []
+    for r in rows:
+        if len(r) >= 4 and str(r[0]).strip():
+            try:
+                scored.append((float(str(r[3]).replace(",", "")), str(r[0]).strip()))
+            except ValueError:
+                pass
+    if len(scored) < 10:
+        return ""
+    scored.sort(reverse=True)
+    best = [h for _, h in scored[:8]]
+    worst = [h for _, h in scored[-5:]]
+    return ("\n\nWHAT WORKS ON OUR CHANNELS (real view counts) - write more like the top ones, avoid the bottom ones' style:\n"
+            "Top hooks: " + " | ".join(best) + "\nWorst hooks: " + " | ".join(worst))
 
 
 def frames(path, tmp, n=4):
@@ -161,6 +194,10 @@ def main():
         print("No ANTHROPIC_API_KEY, screener skipped"); return
     sheet = os.environ["SHEET_ID"]
     g = Google()
+    global LEARNED
+    LEARNED = learned_style(g, sheet)
+    if LEARNED:
+        print("Using what worked so far:", LEARNED[:200])
     head = g.get_values(sheet, f"'{C.PANEL_TAB}'!A{C.HEADER_ROWS}:Z{C.HEADER_ROWS}")[0]
     need = {"id": "Clip ID", "streamer": "Streamer", "title": "Clip Title", "top": "🎯 TOP TEXT",
             "decision": "✅ YOUR DECISION", "notes": "Notes",
@@ -194,7 +231,7 @@ def main():
                 imgs = frames(path, tmp)
                 prompt = PROMPT.format(streamer=cell(r, "streamer"), platform=cell(r, "platform"),
                                        title=cell(r, "title").lstrip("'"), views=cell(r, "views"),
-                                       seconds=cell(r, "secs"), transcript=transcript(path))
+                                       seconds=cell(r, "secs"), transcript=transcript(path), learned=LEARNED)
                 try:
                     res = ask_claude(key, prompt, imgs)
                 except RuntimeError as e:
@@ -204,7 +241,8 @@ def main():
                     prompt = PROMPT.format(streamer=cell(r, "streamer"), platform=cell(r, "platform"),
                                            title=cell(r, "title").lstrip("'"), views=cell(r, "views"),
                                            seconds=cell(r, "secs"),
-                                           transcript="(left out - go by the frames and title; keep hooks clean)")
+                                           transcript="(left out - go by the frames and title; keep hooks clean)",
+                                           learned=LEARNED)
                     res = ask_claude(key, prompt, imgs)
                 hooks = [re.sub(r'["#]', "", str(h)).strip()[:60] for h in (res.get("hooks") or [])][:5]
                 hooks = [h for h in hooks if h]
