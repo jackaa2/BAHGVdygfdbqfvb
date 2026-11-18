@@ -147,3 +147,12 @@ DAILY_BATCH_HOUR = 9             # one review a day: the day's reel is built fro
 BAD_REMAKE = ["Hook is bad", "Captions are off", "Trim / cut is off", "Audio problem", "Looks wrong (watermark/credit)"]
 BAD_SWAP = ["Boring / not funny", "Not GTA 6", "Nudity / NSFW", "Not English", "Duplicate clip"]
 FEEDBACK_TAB = "🗒 Feedback"
+
+# 💸 Expenses: the robot logs every cost on the "💸 Expenses" tab and totals them on Analytics.
+EXPENSE_TAB = "💸 Expenses"
+# monthly subscriptions: (name, $ per month, day of the month it bills). Change here if a plan changes.
+SUBSCRIPTIONS = [("Upload-Post Basic", 24.00, 18)]
+
+# 🧾 every clip the robot ever grabbed (never cleaned up): ID, source clip, and which channels it went out on.
+# The grabber never takes the same source clip twice; the poster never puts one on the same channel twice.
+CLIP_LOG_TAB = "🧾 Clip log"

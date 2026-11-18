@@ -484,10 +484,10 @@ function checkAlerts_() {
   // Claude credit running low (estimate on the Analytics tab)
   try {
     const an = SpreadsheetApp.getActive().getSheetByName('📊 Analytics');
-    const left = an.getRange('O6').getValue(), floor = Number(an.getRange('O7').getValue()) || 2;
+    const left = an.getRange('J13').getValue(), floor = Number(an.getRange('J15').getValue()) || 2;
     if (left !== '' && !isNaN(left) && Number(left) < floor)
       sendAlert_('💳 Clip robot: Claude credit is down to about $' + Number(left).toFixed(2) +
-                 '. Top up at console.anthropic.com, then type the new balance on the Analytics tab (O4).');
+                 '. Top up at console.anthropic.com, then type the new balance on the Analytics tab (yellow box).');
   } catch (e) {}
   // robot hasn't run for 2+ hours
   const m = status.match(/Robot · (\w+) (\d+):(\d+) (AM|PM)/);

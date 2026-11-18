@@ -395,6 +395,17 @@ def main():
             if t >= after:
                 return t
 
+    # 🚫 never the same video twice on one channel: by our clip ID and by the original Twitch/Kick clip
+    clip_log = g.get_values(sheet, f"'{C.CLIP_LOG_TAB}'!A2:C") or []
+    src_of = {str(x[0]).strip(): str(x[1]).strip().lower() for x in clip_log if len(x) > 1 and x[1]}
+    on_channel = set()
+    for p in g.get_values(sheet, f"'{C.POSTS_TAB}'!B2:D") or []:
+        if len(p) > 2:
+            cid = str(p[2]).strip()
+            on_channel.add((cid, str(p[0]).strip()))
+            if src_of.get(cid):
+                on_channel.add((src_of[cid], str(p[0]).strip()))
+
     head, rows = panel(g, sheet)
     drop = []
     with tempfile.TemporaryDirectory() as tmp:
@@ -414,9 +425,9 @@ def main():
                                 [["⚠️ Posting isn't switched on yet"]])
                 continue
             bid = str(h[R_BATCH]).strip()
-            done = remade = failed = 0
+            done = remade = failed = dupes = 0
             for i, r in enumerate(review):
-                if is_header(r) or str(r[R_BATCH]).strip() != bid or str(r[R_STATUS]).startswith("📅"):
+                if is_header(r) or str(r[R_BATCH]).strip() != bid or str(r[R_STATUS]).startswith(("📅", "🚫")):
                     continue
                 clip_id, a, rn = str(r[R_ID]).strip(), int(r[R_CH]), i + C.REVIEW_HEADER_ROW + 1
                 one = ticked(r[R_POST]) and ticked(r[R_SURE])
@@ -424,6 +435,12 @@ def main():
                     continue          # only the ones you ticked (✅ + ☑) one by one
                 if bad_reason(r[R_BAD]) or str(r[R_STATUS]).startswith("⏳"):
                     remade += 1       # 👎 / being remade: never posts the old video
+                    continue
+                if (clip_id, str(a)) in on_channel or (src_of.get(clip_id), str(a)) in on_channel:
+                    g.update_values(sheet, f"'{C.REVIEW_TAB}'!{L(R_STATUS)}{rn}:{L(R_LIVE)}{rn}",
+                                    [[f"🚫 Already posted on Ch{a} - skipped", ""]])
+                    print(f"{clip_id} ch{a}: already on that channel, skipped")
+                    dupes += 1
                     continue
                 user = C.UPLOAD_POST_USERS.get(a)
                 slot = next_slot(a, first)
@@ -467,12 +484,26 @@ def main():
                 g.update_values(sheet, f"'{C.REVIEW_TAB}'!{L(R_STATUS)}{rn}:{L(R_LIVE)}{rn}",
                                 [[f"📅 Scheduled {slot:%a %-I:%M %p}", slot.strftime("%Y-%m-%d %H:%M")]])
                 set_panel(g, sheet, head, rows, clip_id, {"Status": "Scheduled"})
+                on_channel.add((clip_id, str(a)))
+                if src_of.get(clip_id):
+                    on_channel.add((src_of[clip_id], str(a)))
+                try:   # 🧾 Clip log: which channel + when
+                    ids = [str(x[0]).strip() if x else "" for x in clip_log]
+                    if clip_id in ids:
+                        n = ids.index(clip_id) + 2
+                        prev = (g.get_values(sheet, f"'{C.CLIP_LOG_TAB}'!F{n}") or [[""]])
+                        prev = str(prev[0][0]).strip() if prev and prev[0] else ""
+                        g.update_values(sheet, f"'{C.CLIP_LOG_TAB}'!F{n}",
+                                        [[(prev + " · " if prev else "") + f"Ch{a} {slot:%m/%d %-I:%M %p}"]])
+                except Exception as e:
+                    print(f"clip log: {e}")
                 booked[a].add(slot)
                 clip_times.setdefault(clip_id, []).append(slot)
                 done += 1
                 print(f"{clip_id} -> channel {a} at {slot:%a %I:%M %p}")
             note = f"✅ {done} booked" + (f" · {remade} being remade (✅ + ☑ them when ready)" if remade else "") + \
                    (f" · ⚠️ {failed} failed (tick ✅ + ☑ again to retry)" if failed else "") + \
+                   (f" · 🚫 {dupes} already on that channel" if dupes else "") + \
                    (" · auto-posted" if auto and not ticked(h[R_POST]) else "")
             if failed:
                 note = note.replace("✅", "⏳", 1)
@@ -493,7 +524,7 @@ def main():
             continue
         bid = str(h[R_BATCH]).strip()
         mine = [i for i, r in enumerate(review) if not is_header(r) and str(r[R_BATCH]).strip() == bid]
-        if all(str(review[i][R_STATUS]).startswith("📅") for i in mine):   # all booked (or none left)
+        if all(str(review[i][R_STATUS]).startswith(("📅", "🚫")) for i in mine):   # all booked (or none left)
             old += [hi] + mine
             if str(h[R_FILE]).strip():
                 try:

@@ -167,26 +167,26 @@ def ask_claude(key, prompt, imgs):
     raise RuntimeError(last)
 
 
-def track_credit(g, sheet):
-    """Analytics tab N4:O8: you type your Claude balance in O4 whenever you top up; the robot adds up what
-    each run costs in O5 (and starts again from 0 whenever O4 changes). O6 = what's left."""
-    vals = g.get_values(sheet, f"'{C.ANALYTICS_TAB}'!O4:O8") or []
-    vals = [str(v[0]).strip() if v else "" for v in vals] + [""] * 5
-    money = lambda v: float(str(v).replace("$", "").replace(",", "") or 0)
-    try:
-        topped, spent = money(vals[0]), money(vals[1])
-        seen = money(vals[4]) if vals[4] else None
-    except ValueError:
-        return
-    if seen is None or abs(topped - seen) > 0.004:   # new balance typed in: start counting again
-        spent = 0.0
-        g.update_values(sheet, f"'{C.ANALYTICS_TAB}'!O8", [[topped]])
-    spent += SPENT["usd"]
-    g.update_values(sheet, f"'{C.ANALYTICS_TAB}'!O5", [[round(spent, 4)]])
+def track_credit(g, sheet, screened=0):
+    """Logs this run's Claude cost on the 💸 Expenses tab (Analytics adds it all up).
+    Analytics J14 = your balance when you last topped up; when it changes the robot notes the date (Q4:Q5)
+    so 'credit left' only counts what was spent since."""
+    import datetime as dt
+    from zoneinfo import ZoneInfo
+    now = dt.datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d %H:%M")
+    if SPENT["usd"] > 0:
+        g.append_rows(sheet, f"'{C.EXPENSE_TAB}'!A:D",
+                      [[now, "Claude AI", round(SPENT["usd"], 4), f"{screened} clip(s) screened"]])
+    vals = g.get_values(sheet, f"'{C.ANALYTICS_TAB}'!J14") or [[""]]
+    topped = str(vals[0][0] if vals and vals[0] else "").strip()
+    seen = g.get_values(sheet, f"'{C.ANALYTICS_TAB}'!Q4") or [[""]]
+    seen = str(seen[0][0] if seen and seen[0] else "").strip()
+    if topped and topped != seen:     # new balance typed in: count from now
+        g.update_values(sheet, f"'{C.ANALYTICS_TAB}'!Q4:Q5", [[topped], [now]])
     if CREDIT_OUT["hit"]:
         g.update_values(sheet, f"'{C.PANEL_TAB}'!G1",
                         [["🤖 Robot · ❌ FAILED: Claude credit ran out - top up at console.anthropic.com"]])
-    print(f"Claude cost this run ${SPENT['usd']:.4f}; since last top-up ${spent:.2f} of ${topped:.2f}")
+    print(f"Claude cost this run ${SPENT['usd']:.4f}")
 
 
 def col_letter(i):
@@ -308,7 +308,7 @@ def main():
                     pass
     print(f"Wrote hooks for {done} clip(s)")
     try:
-        track_credit(g, sheet)
+        track_credit(g, sheet, done)
     except Exception as e:
         print(f"credit counter: {e}")
     if sent and os.environ.get("GITHUB_OUTPUT"):

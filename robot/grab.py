@@ -296,6 +296,26 @@ def main():
         for cell in row:
             for u in re.findall(r'https?://(?:www\.|clips\.)?(?:twitch\.tv|kick\.com)[^"\s]*', str(cell)):
                 known.add(clip_key(u))
+    # 🧾 Clip log: every clip ever grabbed (rows there are never cleaned up) -> never grab it again
+    try:
+        log = g.get_values(sheet, f"'{C.CLIP_LOG_TAB}'!A2:C") or []
+        if not log:   # first run: start the log from what's on the Control Panel now
+            seed = []
+            for row in panel:
+                cid = str(row[0]).strip() if row else ""
+                u = re.findall(r'https?://(?:www\.|clips\.)?(?:twitch\.tv|kick\.com)[^"\s]*', " ".join(map(str, row)))
+                if cid and u:
+                    seed.append([cid, clip_key(u[0]), u[0], "", ""])
+            if seed:
+                g.append_rows(sheet, f"'{C.CLIP_LOG_TAB}'!A:E", seed)
+                log = seed
+        for row in log:
+            if len(row) > 1 and row[1]:
+                known.add(str(row[1]).strip().lower())
+            if row:
+                panel.append([row[0]])   # logged IDs still count, so numbers never repeat
+    except Exception as e:
+        print(f"clip log: {e}")
     try:  # clips deleted with the 🗑 button are remembered here so they never come back
         for row in g.get_values(sheet, "'Deleted Clips'!A2:B"):
             if len(row) > 1 and row[1]:
@@ -448,6 +468,12 @@ def main():
                 row = [x.replace("{r}", str(next_row)) if isinstance(x, str) else x for x in row]
                 g.update_values(sheet, f"'{C.PANEL_TAB}'!A{next_row}", [row])
                 grabbed += 1
+                try:
+                    g.append_rows(sheet, f"'{C.CLIP_LOG_TAB}'!A:E", [[clip_id, clip_key(c["url"]), c["url"],
+                                                                     safe(c["streamer"]),
+                                                                     now_et.strftime("%Y-%m-%d %H:%M")]])
+                except Exception as e:
+                    print(f"clip log: {e}")
                 try:  # Approve/Reject dropdown only on rows that have a clip
                     gid = g.sheet_gid(sheet, C.PANEL_TAB)
                     g.batch_update(sheet, [{"setDataValidation": {

@@ -80,6 +80,21 @@ def series(ts):
     return out
 
 
+def log_subscriptions(g, sheet, now):
+    """💸 Expenses: each monthly plan gets logged once per billing month (on its billing day)."""
+    log = g.get_values(sheet, f"'{C.EXPENSE_TAB}'!A2:B") or []
+    for name, price, day in C.SUBSCRIPTIONS:
+        y, m = now.year, now.month
+        if now.day < day:
+            y, m = (y - 1, 12) if m == 1 else (y, m - 1)
+        start = dt.datetime(y, m, min(day, 28), tzinfo=now.tzinfo)
+        paid = any(len(r) > 1 and r[1] == name and (parse_et(r[0]) or now) >= start for r in log)
+        if not paid:
+            g.append_rows(sheet, f"'{C.EXPENSE_TAB}'!A:D",
+                          [[start.strftime("%Y-%m-%d %H:%M"), name, price, "monthly plan"]])
+            print(f"Expenses: logged {name} ${price:.2f}")
+
+
 def main():
     key = os.environ.get("UPLOAD_POST_KEY")
     if not (C.POSTING_ENABLED and key):
@@ -87,6 +102,10 @@ def main():
     sheet = os.environ["SHEET_ID"]
     g = Google()
     now = dt.datetime.now(ET)
+    try:
+        log_subscriptions(g, sheet, now)
+    except Exception as e:
+        print(f"expenses: {e}")
     stamp = (g.get_values(sheet, f"'{C.ANALYTICS_TAB}'!A2") or [[""]])[0]
     stamp = stamp[0] if stamp else ""
     if not os.environ.get("FORCE_ANALYTICS"):
@@ -129,13 +148,10 @@ def main():
                     problems.append(f"ch{a} {r.status_code}")
             except requests.RequestException as e:
                 problems.append(f"ch{a} {e}")
-        wt = yt.get("watch_time_minutes")
-        rows.append([num(yt.get("followers")), num(yt.get("views") or yt.get("impressions")), num(yt.get("likes")), num(yt.get("comments")),
-                     round(float(wt) / 60, 1) if isinstance(wt, (int, float)) else "",
-                     num(yt.get("average_view_duration_seconds"))])
+        rows.append([num(yt.get("followers"))])
         for d, v in series(yt.get("reach_timeseries")).items():
             daily.setdefault(d, {})[a] = v
-    g.update_values(sheet, f"'{C.ANALYTICS_TAB}'!C5:H9", rows)
+    g.update_values(sheet, f"'{C.ANALYTICS_TAB}'!C6:C10", rows)      # subscribers (the rest is formulas)
     days = sorted(daily)[-30:]
     table = [[d] + [daily[d].get(a, "") for a in sorted(C.CHANNELS)] for d in days]
     table += [[""] * 6] * (30 - len(table))
