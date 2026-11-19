@@ -98,6 +98,35 @@ def cleanup(g, now_et):
 AUTO_TAG = "🤖 AUTO"
 
 
+def refresh_views(g, sheet, tw):
+    """Clips keep getting views after we grab them. Update the Views of clips still waiting for a pick
+    (Twitch, last 36 h) so auto-pick and Rush choose what actually went viral, not what was big at grab time."""
+    head = [str(h).strip() for h in g.get_values(sheet, f"'{C.PANEL_TAB}'!A{C.HEADER_ROWS}:Z{C.HEADER_ROWS}")[0]]
+    if "Views" not in head or "Status" not in head:
+        return 0
+    vi, si = head.index("Views"), head.index("Status")
+    link = {}
+    for x in g.get_values(sheet, f"'{C.CLIP_LOG_TAB}'!A2:C") or []:
+        m = re.search(r"twitch\.tv/[^/]+/clip/([\w-]+)", x[2] if len(x) > 2 else "")
+        if m:
+            link[str(x[0]).strip()] = m.group(1).lower()
+    rows = g.get_values(sheet, f"'{C.PANEL_TAB}'!A{C.HEADER_ROWS + 1}:Z") or []
+    want = {str(r[0]).strip(): link[str(r[0]).strip()] for r in rows
+            if r and str(r[0]).strip() in link and len(r) > si and str(r[si]).strip() == "New"}
+    if not want:
+        return 0
+    now = tw.views_now(list(want.values()))
+    ids = [str(x[0]).strip() if x else "" for x in g.get_values(sheet, f"'{C.PANEL_TAB}'!A{C.HEADER_ROWS + 1}:A") or []]
+    col = chr(65 + vi)
+    data = {}
+    for i, cid in enumerate(ids):           # rows re-read right before writing (they can move)
+        v = now.get(want.get(cid, ""))
+        if v:
+            data[f"'{C.PANEL_TAB}'!{col}{C.HEADER_ROWS + 1 + i}"] = [[v]]
+    g.update_many(sheet, data)
+    return len(data)
+
+
 def auto_pick(g, sheet, now_et):
     """Every 6 hours (12am, 6am, 12pm, 6pm ET) the robot approves the most-viewed undecided clips grabbed in
     the last 6 hours, up to AUTO_PICKS_PER_WINDOW. Claude then screens each one (skips duds) and writes the
@@ -544,6 +573,14 @@ def main():
             print(f"Clean-up: deleted {removed} old file(s)")
     except Exception as e:
         errors.append(f"clean-up: {e}")
+
+    # --- fresh view counts before picking (what went viral since we grabbed it) ---
+    try:
+        n = refresh_views(g, sheet, tw)
+        if n:
+            print(f"Views refreshed on {n} waiting clip(s)")
+    except Exception as e:
+        errors.append(f"view refresh: {e}")
 
     # --- Auto-pick: the 10 most-viewed new clips of each 6-hour window go straight to Claude + editing ---
     if getattr(C, "AUTO_PICK", False) and not test:

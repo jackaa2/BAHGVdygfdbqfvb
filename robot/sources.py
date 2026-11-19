@@ -33,6 +33,15 @@ class Twitch:
                 break
         return out
 
+    def views_now(self, slugs):
+        """Current view counts for Twitch clip slugs (100 per call)."""
+        out = {}
+        slugs = [x for x in slugs if x]
+        for i in range(0, len(slugs), 100):
+            for c in self._get("clips", [("id", x) for x in slugs[i:i + 100]]):
+                out[c["id"].lower()] = int(c.get("view_count") or 0)
+        return out
+
     def game_ids(self, names):
         return {g["id"]: g["name"] for g in self._get("games", [("name", n) for n in names])}
 

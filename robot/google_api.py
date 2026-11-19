@@ -66,6 +66,13 @@ class Google:
         self._req("PUT", f"{SHEETS}/{sheet_id}/values/{requests.utils.quote(rng)}",
                   params={"valueInputOption": "USER_ENTERED"}, json={"values": values})
 
+    def update_many(self, sheet_id, data):
+        """Several {range: values} writes in ONE request (saves Google's per-minute write quota)."""
+        if data:
+            self._req("POST", f"{SHEETS}/{sheet_id}/values:batchUpdate", json={
+                "valueInputOption": "USER_ENTERED",
+                "data": [{"range": rng, "values": vals} for rng, vals in data.items()]})
+
     def batch_update(self, sheet_id, requests_):
         self._req("POST", f"{SHEETS}/{sheet_id}:batchUpdate", json={"requests": requests_})
 

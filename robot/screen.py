@@ -65,8 +65,11 @@ Write 5 DIFFERENT angles, one each (each goes on a different channel, so no near
   1. roast: clown the streamer for what he did ("kai's driving should be illegal")
   2. pov / relatable: ("pov: you let adin drive")
   3. setup that teases the payoff ("speed had ONE job in gta 6")
-  4. the funniest real line he says, short, in quotes if it's a quote ("'trust me bro' -xqc, seconds before")
-  5. reaction / stakes ("nah the NPC cooked him 😭")
+  4. deadpan / ironic understatement ("speed is a responsible driver btw") - or his funniest exact line,
+     but ONLY if that line is funny on its own with no context
+  5. reaction / stakes ("the NPC cooked him 😭")
+Brainstorm at least 10 in your head and keep only the 5 funniest. No two hooks may start with the same word,
+use "pov:" and "nah" at most once each, and a hook must make sense to someone who has never seen this streamer.
 Good energy (don't copy): "bro thought he was in fast and furious 💀" · "lacy fumbled the easiest heist ever" ·
   "nah this man is NOT okay" · "the NPC said no 😭" · "speed has 0 brain cells today"
 
