@@ -1,0 +1,33 @@
+name: Take down + repost Shorts
+on:
+  workflow_dispatch:
+    inputs:
+      ids:
+        description: "Clip IDs, comma separated"
+        required: true
+permissions:
+  contents: read
+  actions: write
+jobs:
+  repost:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -q requests
+      - working-directory: robot
+        env:
+          REPOST_IDS: ${{ inputs.ids }}
+          UPLOAD_POST_KEY: ${{ secrets.UPLOAD_POST_KEY }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
+          SHEET_ID: ${{ secrets.SHEET_ID }}
+        run: python -u repost.py
+      - name: Post them again
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run post.yml -R ${{ github.repository }}
