@@ -413,7 +413,7 @@ def main():
         ci = head0.index("Clip ID")
         alive = {str(r[ci]).strip() for r in rows0 if len(r) > ci}
         gone = [i for i, r in enumerate(review) if not is_header(r) and str(r[R_ID]).strip() not in alive
-                and not str(r[R_STATUS]).startswith(("📅", "⏳"))]
+                and not str(r[R_STATUS]).startswith(("📅", "⏳", "🔁"))]
         if gone and alive:
             delete_rows(g, sheet, gone)
             print(f"Review: removed {len(gone)} expired video(s)")
