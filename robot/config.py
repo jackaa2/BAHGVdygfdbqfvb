@@ -194,3 +194,8 @@ HOT_MIN_VIEWS = 1500
 # ⏸ channels on hold: get no new clips and post nothing (set back to set() to resume).
 # Ch2 paused 11/19 1 AM: its Shorts kept vanishing / staying blocked on YouTube while the other 4 went live.
 PAUSED_CHANNELS = {2}
+
+# ⬆️ uploads happen just in time (YouTube rate-limits bursts): ~1 h before each slot, a few per run, spaced out
+UPLOAD_AHEAD_MIN = 75
+UPLOADS_PER_RUN = 3
+UPLOAD_GAP_SECONDS = 20

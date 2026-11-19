@@ -7,6 +7,7 @@ Finished videos wait on the 🎬 Review tab. For each row:
 Off until POSTING_ENABLED = True and the UPLOAD_POST_KEY secret is set (redo works either way)."""
 import datetime as dt
 import json
+import time
 import os
 import re
 import sys
@@ -148,6 +149,82 @@ def wrong_channels(key):
             bad[a] = other[0]
             print(f"⚠️ ch{a} profile '{user}' looks connected to channel {other[0]} - not posting there")
     return bad
+
+
+def upload_due(g, sheet, key, now, booked, next_slot, wrong):
+    """📒 Posts is the queue. Each run:
+    1) checks uploads that were sent: failed (e.g. YouTube rate limit) -> back in the queue, new slot if needed
+    2) uploads the queued Shorts whose slot is within UPLOAD_AHEAD_MIN, at most UPLOADS_PER_RUN, one by one."""
+    H = {"Authorization": f"Apikey {key}"}
+    posts = g.get_values(sheet, f"'{C.POSTS_TAB}'!A2:P") or []
+    data, sent = {}, 0
+    for i, p in enumerate(posts):
+        p = p + [""] * (16 - len(p))
+        rn = i + 2
+        a = int(p[1] or 0)
+        cid, slot, link, rid, fid = str(p[3]).strip(), parse_et(p[7]), str(p[8]), str(p[12]).strip(), str(p[15]).strip()
+        if not slot or not a:
+            continue
+        if not fid and "youtube.com" not in link and now - slot < dt.timedelta(days=2):
+            try:   # older rows didn't keep the file id: find the channel's rendered video by name
+                fid = g.find_child(C.ACCOUNT_FOLDERS[a], f"{cid}_A{a}.mp4", folder=False) or ""
+                if fid:
+                    data[f"'{C.POSTS_TAB}'!P{rn}"] = [[fid]]
+            except Exception:
+                fid = ""
+        # 1) sent but not confirmed yet -> ask Upload-Post
+        if rid and "youtube.com" not in link and now - slot < dt.timedelta(days=2):
+            try:
+                st = requests.get(f"https://api.upload-post.com/api/uploadposts/status?request_id={rid}",
+                                  headers=H, timeout=60).json()
+                res = (st.get("results") or [{}])[0]
+            except Exception:
+                continue
+            if res.get("success") and res.get("post_url"):
+                data[f"'{C.POSTS_TAB}'!I{rn}"] = [[res["post_url"]]]
+            elif res.get("success") is False and fid:
+                err = str(res.get("error_message") or "failed")[:80]
+                new = slot if slot - now > dt.timedelta(minutes=30) else next_slot(a, now + dt.timedelta(minutes=45))
+                booked[a].add(new)
+                data[f"'{C.POSTS_TAB}'!H{rn}:I{rn}"] = [[new.strftime("%Y-%m-%d %H:%M"),
+                                                         f"🕒 retry queued ({err})"]]
+                data[f"'{C.POSTS_TAB}'!M{rn}"] = [[""]]
+                print(f"{cid} ch{a}: upload failed ({err}) -> re-queued for {new:%a %-I:%M %p}")
+            continue
+        # 2) queued and due soon -> upload it now
+        if rid or not fid or a in wrong or a in getattr(C, "PAUSED_CHANNELS", set()):
+            continue
+        if slot - now > dt.timedelta(minutes=C.UPLOAD_AHEAD_MIN) or sent >= C.UPLOADS_PER_RUN:
+            continue
+        if slot - now < dt.timedelta(minutes=20):          # too close / missed: next free slot
+            slot = next_slot(a, now + dt.timedelta(minutes=30))
+            booked[a].add(slot)
+            data[f"'{C.POSTS_TAB}'!H{rn}"] = [[slot.strftime("%Y-%m-%d %H:%M")]]
+        title, desc, tags = title_and_tags(str(p[6]).strip(), str(p[4]).strip(), cid)
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                path = g.download(fid, os.path.join(tmp, f"{cid}_A{a}.mp4"))
+                with open(path, "rb") as f:
+                    resp = requests.post(API, headers={**H, "Idempotency-Key": f"{cid}-A{a}-{fid}-{slot:%m%d%H%M}"},
+                                         data={"user": C.UPLOAD_POST_USERS.get(a), "platform[]": "youtube",
+                                               "title": title, "description": desc, "tags": tags,
+                                               "privacyStatus": "private",           # goes public at `slot`
+                                               "youtube_publish_at": slot.isoformat()},
+                                         files={"video": (os.path.basename(path), f, "video/mp4")}, timeout=600)
+            body = resp.json() if resp.ok else {}
+        except Exception as e:
+            print(f"{cid} ch{a}: upload error {e}")
+            continue
+        if not resp.ok:
+            print(f"{cid} ch{a}: Upload-Post said {resp.status_code} {resp.text[:120]}")
+            continue
+        new_rid = body.get("request_id") or body.get("job_id") or ""
+        data[f"'{C.POSTS_TAB}'!I{rn}"] = [[f"⬆️ uploading - goes public {slot:%a %-I:%M %p}"]]
+        data[f"'{C.POSTS_TAB}'!M{rn}"] = [[new_rid]]
+        sent += 1
+        print(f"{cid} -> ch{a} uploaded, public at {slot:%a %-I:%M %p}")
+        time.sleep(C.UPLOAD_GAP_SECONDS)
+    g.update_many(sheet, data)
 
 
 def skip_batches(g, sheet, review):
@@ -492,6 +569,11 @@ def main():
                 on_channel.add((src_of[cid], str(p[0]).strip()))
 
     wrong = wrong_channels(key) if posting else {}
+    if posting:
+        try:
+            upload_due(g, sheet, key, now, booked, next_slot, wrong)
+        except Exception as e:
+            print(f"upload problem: {e}")
 
     try:   # 🤖 autopilot: earned from how often you approve what the robot makes
         from learn import autopilot
@@ -565,40 +647,17 @@ def main():
                         break
                     slot = next_slot(a, max(clash) + spread)
                 hook = str(r[R_HOOK]).strip() or f"{r[R_STREAMER]} in GTA 6"
-                title, desc, tags = title_and_tags(hook, str(r[R_STREAMER]).strip(), clip_id)
-                try:
-                    path = g.download(str(r[R_FILE]).strip(), os.path.join(tmp, f"{clip_id}_A{a}.mp4"))
-                    with open(path, "rb") as f:
-                        resp = requests.post(API, headers={"Authorization": f"Apikey {key}",
-                                                           "Idempotency-Key": f"{clip_id}-A{a}-{r[R_FILE]}"},
-                                             data={"user": user, "platform[]": "youtube",
-                                                   "title": title, "description": desc, "tags": tags,
-                                                   # upload now as private + YouTube's own schedule, so it shows
-                                                   # in YouTube Studio as "Scheduled" right away and goes public at `slot`
-                                                   "privacyStatus": "private",
-                                                   "youtube_publish_at": slot.isoformat()},
-                                             files={"video": (os.path.basename(path), f, "video/mp4")}, timeout=600)
-                    os.remove(path)
-                except Exception as e:
-                    resp = None
-                    err = str(e)[:100]
-                if resp is None or resp.status_code >= 300:
-                    msg = f"⚠️ {err if resp is None else f'Upload-Post said {resp.status_code}: {resp.text[:90]}'}"
-                    g.update_values(sheet, f"'{C.REVIEW_TAB}'!{L(R_STATUS)}{rn}", [[msg]])
-                    print(f"{clip_id} ch{a}: {msg}"); failed += 1
-                    continue
-                try:
-                    body = resp.json()
-                except ValueError:
-                    body = {}
-                rid = body.get("request_id") or body.get("job_id") or ""
-                g.append_rows(sheet, f"'{C.POSTS_TAB}'!A:O", [[
+                # queued: the video uploads by itself ~1 h before its slot (one at a time, so YouTube never
+                # sees a burst of uploads - that's what got 19 uploads rate-limited at once)
+                g.append_rows(sheet, f"'{C.POSTS_TAB}'!A:P", [[
                     now.strftime("%Y-%m-%d %H:%M"), a, C.CHANNELS[a], clip_id, r[R_STREAMER],
                     (f'=HYPERLINK("{link_of[clip_id]}","original")' if clip_id in link_of else ""), hook,
-                    slot.strftime("%Y-%m-%d %H:%M"), "", "", "", "", rid, "",
-                    "autopilot" if (auto and not one and not ticked(h[R_POST])) else "you"]])
+                    slot.strftime("%Y-%m-%d %H:%M"), "🕒 queued - uploads about 1 h before it goes live",
+                    "", "", "", "", "",
+                    "autopilot" if (auto and not one and not ticked(h[R_POST])) else "you",
+                    str(r[R_FILE]).strip()]])
                 g.update_values(sheet, f"'{C.REVIEW_TAB}'!{L(R_STATUS)}{rn}:{L(R_LIVE)}{rn}",
-                                [[f"📅 Scheduled {slot:%a %-I:%M %p}", slot.strftime("%Y-%m-%d %H:%M")]])
+                                [[f"📅 Booked {slot:%a %-I:%M %p}", slot.strftime("%Y-%m-%d %H:%M")]])
                 set_panel(g, sheet, head, rows, clip_id, {"Status": "Scheduled"})
                 on_channel.add((clip_id, str(a)))
                 if src_of.get(clip_id):
