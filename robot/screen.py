@@ -16,8 +16,8 @@ import config as C
 from google_api import Google
 
 API = "https://api.anthropic.com/v1/messages"
-# Sonnet writes much funnier, sharper hooks than Haiku (about 1-2 cents a clip); Haiku is the backup
-MODELS = ["claude-sonnet-5-5", "claude-haiku-5-5"]
+# Haiku: about 1/20th the cost of Sonnet (~$1-2 a month). Sonnet only steps in if Haiku errors out.
+MODELS = ["claude-haiku-5-5", "claude-sonnet-5-5"]
 MAX_PER_RUN = 25
 AUTO_TAG = "🤖 AUTO"
 LEARNED = ""
