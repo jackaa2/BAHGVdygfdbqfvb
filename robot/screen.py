@@ -44,9 +44,11 @@ Reply with ONLY this JSON, nothing else:
 
 "postable": false if the clip is not worth posting: it is not GTA 6 (another game, or just talking with
 no GTA 6 on screen or being discussed), nothing happens (loading screens, menus, dead air, AFK),
-it isn't a streamer moment, it's mostly non-English, it's unwatchable, it's hateful, OR it shows ANY nudity or
-sexual content at all - even brief or partial (exposed breasts/butts, strippers, lap dances, sex scenes, strip clubs,
-explicit poses), in the game or on the streamer's camera. When in doubt about nudity, it's false.
+it isn't a streamer moment, it's mostly non-English, it's unwatchable, it's hateful, OR it shows real nudity or
+sexual content: exposed breasts/nipples, bare butts, genitals, sex scenes, lap dances, strippers / strip clubs,
+explicit sexual poses - in the game or on the streamer's camera. NOT nudity (these are fine): shirtless guys,
+swimsuits/bikinis at a beach or pool, gym clothes, a towel, crude jokes without anything shown. If you clearly see
+real nudity or a strip club, it's false; don't reject on a guess.
 Otherwise true. "reason": why, in a few words.
 
 Hooks = the caption on top of the Short AND its YouTube title. They decide if someone stops scrolling.
