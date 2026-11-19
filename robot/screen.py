@@ -71,6 +71,20 @@ def redo_note(notes):
             f"\"{m.group(1).strip()}\"") if m else ""
 
 
+def learned_feedback(g, sheet):
+    """What you've 👎'd lately -> Claude avoids picking / writing that again."""
+    rows = (g.get_values(sheet, f"'{C.FEEDBACK_TAB}'!A2:F") or [])[-25:]
+    if not rows:
+        return ""
+    lines = []
+    for f in rows:
+        f = f + [""] * (6 - len(f))
+        lines.append(f"- {f[5]}: {f[3]} clip, hook \"{f[4]}\"")
+    return ("\n\nThe team REJECTED these recent videos (reason: streamer, hook). Be stricter about the same "
+            "problems: skip clips like these (set postable false) and never write hooks like the rejected ones:\n"
+            + "\n".join(lines))
+
+
 def learned_style(g, sheet):
     """What's worked on OUR channels so far (📒 Posts: hook + views) -> fed back into the prompt so Claude
     leans toward the hook styles that get views. Needs at least 10 posts with views."""
@@ -205,6 +219,10 @@ def main():
     g = Google()
     global LEARNED
     LEARNED = learned_style(g, sheet)
+    try:
+        LEARNED += learned_feedback(g, sheet)
+    except Exception as e:
+        print(f"feedback: {e}")
     if LEARNED:
         print("Using what worked so far:", LEARNED[:200])
     head = g.get_values(sheet, f"'{C.PANEL_TAB}'!A{C.HEADER_ROWS}:Z{C.HEADER_ROWS}")[0]

@@ -54,3 +54,41 @@ def quiet_hours(g, sheet):
         by.setdefault(p["hour"], []).append(p["views"])
     flops = sorted((sum(v) / len(v), h) for h, v in by.items() if len(v) >= 6 and sum(v) / len(v) < 0.4 * avg)
     return {h for _, h in flops[:C.MAX_QUIET_HOURS]}
+
+
+def trust(g, sheet):
+    """How much your reviews agree with the robot: of the last clips YOU reviewed, how many you approved
+    (📒 Posts made by you) vs marked 👎 (🗒 Feedback). Autopilot posts don't count."""
+    events = []
+    for p in g.get_values(sheet, f"'{C.POSTS_TAB}'!A2:O") or []:
+        p = p + [""] * (15 - len(p))
+        if str(p[14]).strip() != "autopilot" and p[0]:
+            events.append((str(p[0])[:16], 1))
+    for f in g.get_values(sheet, f"'{C.FEEDBACK_TAB}'!A2:F") or []:
+        if f and f[0]:
+            events.append((str(f[0])[:16], 0))
+    events.sort()
+    last = events[-C.AUTOPILOT_WINDOW:]
+    n = len(last)
+    rate = (sum(v for _, v in last) / n) if n else 0.0
+    return n, rate
+
+
+def autopilot(g, sheet):
+    """Returns (on, why). Mode is the 🤖 dropdown on the Review tab:
+    OFF = always wait for you · EARN IT = turns on by itself once your reviews show the robot is good enough · ON."""
+    try:
+        mode = str((g.get_values(sheet, f"'{C.REVIEW_TAB}'!{C.AUTOPILOT_CELL}") or [[""]])[0][0]).upper()
+    except Exception:
+        mode = ""
+    n, rate = trust(g, sheet)
+    stats = f"{rate:.0%} approved of your last {n} reviews"
+    if "OFF" in mode:
+        return False, f"off · {stats}"
+    if mode.endswith(" ON") or mode == "ON" or "ALWAYS" in mode:
+        return True, f"on · {stats}"
+    if n >= C.AUTOPILOT_MIN_REVIEWS and rate >= C.AUTOPILOT_MIN_APPROVAL:
+        return True, f"earned · {stats}"
+    need = max(0, C.AUTOPILOT_MIN_REVIEWS - n)
+    return False, (f"learning · {stats} · needs {C.AUTOPILOT_MIN_APPROVAL:.0%}"
+                   + (f" over {need} more reviews" if need else ""))

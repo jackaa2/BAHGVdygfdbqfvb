@@ -462,14 +462,25 @@ def main():
 
     wrong = wrong_channels(key) if posting else {}
 
+    try:   # 🤖 autopilot: earned from how often you approve what the robot makes
+        from learn import autopilot
+        pilot_on, pilot_why = autopilot(g, sheet)
+    except Exception as e:
+        pilot_on, pilot_why = False, f"off (error: {e})"
+    print(f"🤖 Autopilot {pilot_why}")
+    try:
+        g.update_values(sheet, f"'{C.REVIEW_TAB}'!G2", [["🤖 " + pilot_why]])
+    except Exception:
+        pass
+
     head, rows = panel(g, sheet)
     drop = []
     with tempfile.TemporaryDirectory() as tmp:
         for hi, h in enumerate(review):
             if not is_header(h) or str(h[R_STATUS]).startswith("✅"):
                 continue
-            auto = (C.AUTO_POST_AFTER_HOURS and parse_et(h[R_ADDED]) and
-                    now - parse_et(h[R_ADDED]) > dt.timedelta(hours=C.AUTO_POST_AFTER_HOURS))
+            auto = bool(pilot_on and parse_et(h[R_ADDED]) and
+                        now - parse_et(h[R_ADDED]) > dt.timedelta(hours=C.AUTOPILOT_GRACE_HOURS))
             all_ = bool((ticked(h[R_POST]) and ticked(h[R_SURE])) or auto)
             bid0 = str(h[R_BATCH]).strip()
             singles = [r for r in review if not is_header(r) and str(r[R_BATCH]).strip() == bid0
@@ -495,7 +506,7 @@ def main():
                 if bad_reason(r[R_BAD]) or str(r[R_STATUS]).startswith("⏳"):
                     remade += 1       # 👎 / being remade: never posts the old video
                     continue
-                if not one and str(r[R_STATUS]).startswith("👀 New version"):
+                if not one and not auto and str(r[R_STATUS]).startswith("👀 New version"):
                     remade += 1       # a fixed video needs its own ✅ + ☑ (you haven't seen it yet)
                     continue
                 if (clip_id, str(a)) in on_channel or (src_of.get(clip_id), str(a)) in on_channel:
@@ -545,10 +556,11 @@ def main():
                 except ValueError:
                     body = {}
                 rid = body.get("request_id") or body.get("job_id") or ""
-                g.append_rows(sheet, f"'{C.POSTS_TAB}'!A:N", [[
+                g.append_rows(sheet, f"'{C.POSTS_TAB}'!A:O", [[
                     now.strftime("%Y-%m-%d %H:%M"), a, C.CHANNELS[a], clip_id, r[R_STREAMER],
                     (f'=HYPERLINK("{link_of[clip_id]}","original")' if clip_id in link_of else ""), hook,
-                    slot.strftime("%Y-%m-%d %H:%M"), "", "", "", "", rid, ""]])
+                    slot.strftime("%Y-%m-%d %H:%M"), "", "", "", "", rid, "",
+                    "autopilot" if (auto and not one and not ticked(h[R_POST])) else "you"]])
                 g.update_values(sheet, f"'{C.REVIEW_TAB}'!{L(R_STATUS)}{rn}:{L(R_LIVE)}{rn}",
                                 [[f"📅 Scheduled {slot:%a %-I:%M %p}", slot.strftime("%Y-%m-%d %H:%M")]])
                 set_panel(g, sheet, head, rows, clip_id, {"Status": "Scheduled"})

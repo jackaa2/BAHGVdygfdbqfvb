@@ -146,7 +146,7 @@ REVIEW_HEADER_ROW = 3            # rows 1-2 are the dashboard
 BATCH_MAX_CLIPS = 60            # most clips in one review reel
 BATCH_MIN_CLIPS = 5             # a reel needs at least this many videos (unless one has waited BATCH_MAX_WAIT_MIN)
 BATCH_MAX_WAIT_MIN = 90         # make the batch anyway if a finished video has waited this long
-AUTO_POST_AFTER_HOURS = None    # e.g. 4: a batch nobody touched posts by itself after 4 h (👎 ones skipped)
+AUTO_POST_AFTER_HOURS = None    # (old switch, replaced by the 🤖 Autopilot below)
 DAILY_BATCH_HOUR = 9             # one review a day: the day's reel is built from 9 AM ET (ready for a 10 AM check);
                                 # None = a new batch whenever a set of clips is finished
 
@@ -176,3 +176,14 @@ MAX_QUIET_HOURS = 6     # at most this many hours a day get skipped for flopping
 # two clips of the same streamer made within this many seconds = the same moment clipped twice -> keep only the
 # most-viewed one (stops the same funny moment going out on two channels)
 SAME_MOMENT_SECONDS = 120
+
+# 🤖 AUTOPILOT: the end goal is no reviewing. Dropdown on the Review tab (cell below):
+#   "🤖 Autopilot: EARN IT" (default) - turns on by itself once you've approved >= 90% of your last 40+ reviews
+#   "🤖 Autopilot: ON" / "🤖 Autopilot: OFF"
+# When on: a batch you haven't touched posts by itself AUTOPILOT_GRACE_HOURS after its reel is made
+# (👎 ones never post). You can still review / 👎 anything before then. It turns back off if quality drops.
+AUTOPILOT_CELL = "L2"
+AUTOPILOT_WINDOW = 60          # look at your last N reviews
+AUTOPILOT_MIN_REVIEWS = 40
+AUTOPILOT_MIN_APPROVAL = 0.90
+AUTOPILOT_GRACE_HOURS = 3      # reel at 9 AM -> posts by itself at noon if nobody touched it
