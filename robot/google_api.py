@@ -42,10 +42,14 @@ class Google:
 
     def _req(self, method, url, **kw):
         extra = kw.pop("headers", None)
-        for attempt in range(4):
-            r = requests.request(method, url, headers=self._h(extra), timeout=120, **kw)
-            if r.status_code in (429, 500, 502, 503):
-                time.sleep(2 ** attempt)
+        for attempt in range(7):   # Google's per-minute limit resets within ~60 s: wait it out (~2 min max)
+            try:
+                r = requests.request(method, url, headers=self._h(extra), timeout=120, **kw)
+            except requests.RequestException:
+                time.sleep(min(30, 2 ** (attempt + 1)))
+                continue
+            if r.status_code in (429, 500, 502, 503, 504):
+                time.sleep(min(30, 2 ** (attempt + 1)))
                 continue
             if r.status_code >= 400:
                 raise RuntimeError(f"{method} {url.split('?')[0]} -> {r.status_code}: {r.text[:300]}")

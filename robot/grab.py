@@ -580,7 +580,10 @@ def main():
     status = "✅ OK" if not errors else f"⚠ {len(errors)} issue(s): " + " | ".join(errors[:3])
     line = (f"🤖 Robot · {now_et.strftime('%a %I:%M %p').replace(' 0', ' ')} · "
             f"{'🧪 TEST ' if test else ''}grabbed {grabbed} · {status}")
-    g.update_values(sheet, f"'{C.PANEL_TAB}'!G1", [[line[:400]]])
+    try:
+        g.update_values(sheet, f"'{C.PANEL_TAB}'!G1", [[line[:400]]])
+    except Exception as e:      # the clips are already saved; a busy sheet shouldn't fail the whole run
+        print(f"status line not written: {e}")
     print(f"Grabbed {grabbed} clip(s). {status}")
 
 
