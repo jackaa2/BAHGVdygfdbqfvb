@@ -187,3 +187,6 @@ AUTOPILOT_WINDOW = 60          # look at your last N reviews
 AUTOPILOT_MIN_REVIEWS = 40
 AUTOPILOT_MIN_APPROVAL = 0.90
 AUTOPILOT_GRACE_HOURS = 3      # reel at 9 AM -> posts by itself at noon if nobody touched it
+
+# 🔥 HOT grab (Rush workflow): last 24 h, any streamer, most-viewed first, at least this many views
+HOT_MIN_VIEWS = 1500

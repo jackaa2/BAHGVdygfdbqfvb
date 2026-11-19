@@ -33,6 +33,10 @@ on:
         description: "TEST ONLY: max clips to grab"
         required: false
         default: "5"
+      hot:
+        description: "🔥 yes = grab the most-viewed GTA 6 clips of the last 24 h (any streamer)"
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -74,6 +78,7 @@ jobs:
         if: inputs.check_posting != 'yes'
         working-directory: robot
         env:
+          HOT: ${{ inputs.hot }}
           TWITCH_CLIENT_ID: ${{ secrets.TWITCH_CLIENT_ID }}
           TWITCH_CLIENT_SECRET: ${{ secrets.TWITCH_CLIENT_SECRET }}
           GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}

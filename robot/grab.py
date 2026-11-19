@@ -279,7 +279,8 @@ def main():
     sheet = os.environ.get("SHEET_ID") or C.SHEET_ID_FALLBACK
     g = Google()
     now_et = dt.datetime.now(ET)
-    since = dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=C.LOOKBACK_HOURS)
+    hot = os.environ.get("HOT", "").strip().lower() in ("yes", "true", "1")   # 🔥 biggest clips of the last day
+    since = dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=24 if hot else C.LOOKBACK_HOURS)
     errors, grabbed = [], 0
 
     # --- Drive housekeeping: clear names, remove the empty duplicate ---
@@ -414,12 +415,14 @@ def main():
         most views first inside each group; clips over 25 s need ~40% more views."""
         tier = tier_of.get(norm(c["streamer"]), 9)
         score = c["views"] * (1.0 if c["seconds"] <= C.PREFERRED_SECONDS else 0.7)
-        return (tier, -score)
+        return (0 if hot else tier, -score)     # 🔥 hot: purely most-viewed first
 
     for c in sorted(cands, key=rank):
         if c.get("tracked") and not is_gta(c, gta):
             why["not GTA 6"] += 1; continue
-        if (C.ONLY_TIERS and not test and tier_of.get(norm(c["streamer"])) not in C.ONLY_TIERS
+        if hot and c["views"] < C.HOT_MIN_VIEWS:
+            why["too few views"] += 1; continue
+        if (C.ONLY_TIERS and not test and not hot and tier_of.get(norm(c["streamer"])) not in C.ONLY_TIERS
                 and c["views"] < (getattr(C, "POPULAR_ANY_VIEWS", None) or 10 ** 9)):
             why["not T1/T2"] = why.get("not T1/T2", 0) + 1; continue
         if clip_key(c["url"]) in known or clip_key(c["url"]) in seen:
