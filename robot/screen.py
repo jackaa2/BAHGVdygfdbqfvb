@@ -16,7 +16,8 @@ import config as C
 from google_api import Google
 
 API = "https://api.anthropic.com/v1/messages"
-MODELS = ["claude-haiku-5-5", "claude-sonnet-5-5"]   # fast + cheap first, fallback second
+# Sonnet writes much funnier, sharper hooks than Haiku (about 1-2 cents a clip); Haiku is the backup
+MODELS = ["claude-sonnet-5-5", "claude-haiku-5-5"]
 MAX_PER_RUN = 25
 AUTO_TAG = "🤖 AUTO"
 LEARNED = ""
@@ -38,7 +39,8 @@ Clip info:
 The images are 4 frames from the clip, in order.
 
 Reply with ONLY this JSON, nothing else:
-{{"postable": true, "reason": "<max 12 words>", "hooks": ["<1>", "<2>", "<3>", "<4>", "<5>"]}}
+{{"postable": true, "reason": "<max 12 words>", "moment": "<the funniest moment, max 15 words>",
+  "hooks": ["<best>", "<2>", "<3>", "<4>", "<5>"]}}
 
 "postable": false if the clip is not worth posting: it is not GTA 6 (another game, or just talking with
 no GTA 6 on screen or being discussed), nothing happens (loading screens, menus, dead air, AFK),
@@ -47,20 +49,31 @@ sexual content at all - even brief or partial (exposed breasts/butts, strippers,
 explicit poses), in the game or on the streamer's camera. When in doubt about nudity, it's false.
 Otherwise true. "reason": why, in a few words.
 
-Hooks = the caption on top of the Short AND its YouTube title. Write like a funny clip-page admin, not an AI:
-short, casual, roasting the streamer (lovingly), the way trending Shorts captions talk. 5 DIFFERENT ones
-(each goes on a different channel, no near-copies), each max 45 characters.
-Good style (don't copy, match the energy):
-  "bro thought he was in fast and furious 💀"   "speed has 0 brain cells today"
-  "xqc said 'trust me' and then this happened"  "kai's driving should be illegal"
-  "the NPC cooked him 😭"                        "lacy fumbled the easiest heist ever"
-  "nah this man is NOT okay"                    "pov: you let adin drive"
-Rules: mostly lowercase is fine; slang ok (bro, nah, ts, cooked, fumbled, pov:, lowkey); roast the streamer or
-the moment; it must match what actually happens in the clip; use the streamer's name in at least 2 of them.
-NEVER use these AI-sounding phrases: "pure chaos", "is everything", "absolutely", "unhinged", "wild ride",
-"you won't believe", "insane moment", "wait for it", "Chat, did you", "Why is X ...?" questions, colons
-like "X: Y", em dashes. No hashtags, no quotes around the whole line, no timestamps, never name another game.
-End one or two of them with ONE emoji (💀 😭 😂 🔥 🫠 🤦); the rest no emoji.
+Hooks = the caption on top of the Short AND its YouTube title. They decide if someone stops scrolling.
+First, find THE moment: the single funniest / most shocking thing that happens or is said (use the transcript
+and frames). Every hook must be about that exact moment, with a concrete detail from it (what he hit, what he
+said, who cooked who) - never a generic line that could fit any clip.
+
+What makes a hook work:
+- Tease, don't spoil: set up the moment so they HAVE to watch the payoff ("he had one job" > "he crashed").
+- 3 to 8 words, max 45 characters. Front-load it: the first 2-3 words must grab.
+- Sound like a real clip-page admin texting a friend, not a brand or an AI.
+- Name the streamer the way fans say it (Kai, Speed, xQc, Lacy, Adin, Jason, ohnePixel) in at least 2 hooks.
+- Lowercase is fine. Slang is fine (bro, nah, cooked, fumbled, pov:, lowkey, ts, ain't no way).
+
+Write 5 DIFFERENT angles, one each (each goes on a different channel, so no near-copies), BEST ONE FIRST:
+  1. roast: clown the streamer for what he did ("kai's driving should be illegal")
+  2. pov / relatable: ("pov: you let adin drive")
+  3. setup that teases the payoff ("speed had ONE job in gta 6")
+  4. the funniest real line he says, short, in quotes if it's a quote ("'trust me bro' -xqc, seconds before")
+  5. reaction / stakes ("nah the NPC cooked him 😭")
+Good energy (don't copy): "bro thought he was in fast and furious 💀" · "lacy fumbled the easiest heist ever" ·
+  "nah this man is NOT okay" · "the NPC said no 😭" · "speed has 0 brain cells today"
+
+Never: "pure chaos", "is everything", "absolutely", "unhinged", "wild ride", "you won't believe", "insane moment",
+"wait for it", "chat, did you", "the way he...", "when you...", "Why is X ...?" questions, "X: Y" colons,
+em dashes, hashtags, timestamps, quotes around the whole line, another game's name, spoiling the ending.
+At most TWO hooks end with ONE emoji (💀 😭 😂 🫠 🤦); the rest no emoji.
 Keep them clean: nothing hateful or sexual.{learned}"""
 
 
@@ -244,6 +257,9 @@ def main():
     # hooks are only written for clips you APPROVED (no tokens spent on clips you don't want)
     todo = [r for r in rows if cell(r, "id") and cell(r, "decision") == "Approve"
             and not (cell(r, "h1") or cell(r, "h2") or cell(r, "h3")) and not cell(r, "top")][:MAX_PER_RUN]
+    test = [x.strip() for x in (os.environ.get("HOOK_TEST") or "").split(",") if x.strip()]
+    if test:   # try-out mode: write hooks for these clips and only PRINT them (changes nothing)
+        todo = [r for r in rows if cell(r, "id") in test]
     gid = g.sheet_gid(sheet, C.PANEL_TAB)
     print(f"{len(todo)} clip(s) to screen")
     done = sent = 0
@@ -277,6 +293,11 @@ def main():
                 postable = res.get("postable", True) is not False
                 if not hooks and postable:
                     raise RuntimeError("Claude returned no hooks")
+                if test:
+                    print(f"TEST {clip_id} ({cell(r, 'streamer')}) moment: {res.get('moment')}")
+                    for h in hooks:
+                        print(f"TEST    {h}")
+                    continue
                 # find the row again right before writing (rows can move)
                 ids = g.get_values(sheet, f"'{C.PANEL_TAB}'!A{C.HEADER_ROWS + 1}:A")
                 hit = [C.HEADER_ROWS + 1 + i for i, x in enumerate(ids) if x and str(x[0]).strip() == clip_id]

@@ -1,7 +1,11 @@
 name: Write hooks for approved clips (Claude)
 
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      test:
+        description: "Try-out only: clip IDs (comma separated) - prints new hooks, changes nothing"
+        default: ""
 
 concurrency:
   group: hooks
@@ -39,6 +43,7 @@ jobs:
         working-directory: robot
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          HOOK_TEST: ${{ inputs.test }}
           GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
           GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
