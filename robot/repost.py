@@ -28,7 +28,7 @@ for cid in ids:
     r = requests.post("https://api.upload-post.com/api/uploadposts/posts/unpublish", headers=H, timeout=60,
                       json={"platform": "youtube", "user": user, "post_id": pid})
     print(f"{cid} ch{a} {pid}: unpublish -> {r.status_code} {r.text[:300]}")
-    gone = r.ok or "not found" in r.text.lower() or "404" in r.text
+    gone = r.ok or r.status_code == 404 or "not found" in r.text.lower() or "cannot be found" in r.text.lower()
     if not gone:
         continue
     drop_posts.append(i)
