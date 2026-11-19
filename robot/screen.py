@@ -34,12 +34,13 @@ Clip info:
 - Clip title: {title}
 - Views so far: {views}
 - Length: {seconds}s
-- What's said (auto transcript, may be messy): {transcript}
+- What's said (auto transcript with [start-end] times, may be messy): {transcript}
 
-The images are 4 frames from the clip, in order.
+The images are 4 frames from the clip, in order (at 12%, 37%, 63% and 88% of its length).
 
 Reply with ONLY this JSON, nothing else:
 {{"postable": true, "reason": "<max 12 words>", "moment": "<the funniest moment, max 15 words>",
+  "cut": {{"start": <seconds>, "end": <seconds>}},
   "hooks": ["<best>", "<2>", "<3>", "<4>", "<5>"]}}
 
 "postable": false if the clip is not worth posting: it is not GTA 6 (another game, or just talking with
@@ -50,6 +51,13 @@ explicit sexual poses - in the game or on the streamer's camera. NOT nudity (the
 swimsuits/bikinis at a beach or pool, gym clothes, a towel, crude jokes without anything shown. If you clearly see
 real nudity or a strip club, it's false; don't reject on a guess.
 Otherwise true. "reason": why, in a few words.
+
+"cut" = how a pro Shorts editor would trim it (use the transcript times + loudest moments):
+- start just before the setup of THE moment (~0.5 s before the first line that matters). Cut loading screens,
+  menus, dead air and unrelated chatter at the beginning. Never start mid-sentence.
+- end about 1-1.5 s after the reaction / laugh dies down. Never cut the payoff or the reaction. Never end
+  mid-sentence. Cut anything after that (talking to chat, menus, silence).
+- usually 10-45 s. If the whole clip is already tight, use start 0 and end = its full length.
 
 Hooks = the caption on top of the Short AND its YouTube title. They decide if someone stops scrolling.
 First, find THE moment: the single funniest / most shocking thing that happens or is said (use the transcript
@@ -153,10 +161,31 @@ def transcript(path):
             return "(no audio)"
         audio = np.frombuffer(pcm.stdout, dtype=np.float32)
         segs, _ = _wm.transcribe(audio, vad_filter=True, language="en")
-        text = " ".join(s.text.strip() for s in segs)
-        return text[:1500] or "(no speech)"
+        text = " ".join(f"[{s.start:.1f}-{s.end:.1f}s] {s.text.strip()}" for s in segs)[:2200] or "(no speech)"
+        # loudest moments (yelling / laughing = usually the payoff), per half second
+        if len(audio) > 8000:
+            hop = 8000
+            rms = [(float(np.sqrt(np.mean(audio[i:i + hop] ** 2))), i / 16000) for i in range(0, len(audio) - hop, hop)]
+            top = sorted(rms, reverse=True)[:6]
+            text += "\n- Loudest moments (reactions): " + ", ".join(f"{t:.1f}s" for _, t in sorted(top, key=lambda x: x[1]))
+        return text
     except Exception as e:
         return f"(transcript unavailable: {e})"
+
+
+def smart_cut(cut, secs):
+    """Claude's trim -> 'start-end' for the ✂️ CUT column, only if it's sane and actually removes something."""
+    try:
+        a, b = float(cut["start"]), float(cut["end"])
+        dur = float(str(secs).replace(",", "") or 0)
+    except (TypeError, ValueError, KeyError):
+        return ""
+    if dur <= 0:
+        return ""
+    a, b = max(0.0, a), min(dur, b)
+    if b - a < 6 or (a + (dur - b)) < 1.5:      # too short to be right, or barely trims anything
+        return ""
+    return f"{a:.1f}-{b:.1f}"
 
 
 def ask_claude(key, prompt, imgs):
@@ -251,6 +280,8 @@ def main():
             "h1": "Hook 1", "h2": "Hook 2", "h3": "Hook 3", "h4": "Hook 4", "h5": "Hook 5",
             "status": "Status", "send": "🚀 SEND"}
     col = {k: head.index(v) for k, v in need.items() if v in head}
+    if "✂️ CUT" in head:
+        col["cut"] = head.index("✂️ CUT")
     missing = [need[k] for k in need if k not in col]
     if missing:
         raise RuntimeError(f"missing columns: {missing}")
@@ -326,6 +357,10 @@ def main():
                     "rule": {"condition": {"type": "ONE_OF_LIST", "values": [
                         {"userEnteredValue": h} for h in hooks + ["(no top text)"]]},
                         "showCustomUi": True, "strict": False}}}])
+                cut = smart_cut(res.get("cut"), cell(r, "secs"))
+                if cut and "cut" in col and not cell(r, "cut"):
+                    put("cut", cut)
+                    print(f"{clip_id}: ✂️ trimmed to {cut}")
                 if auto:  # no human step: channel 1 gets hook 1, the others get hooks 2-5; send to editing
                     put("top", hooks[0])
                     put("send", True)

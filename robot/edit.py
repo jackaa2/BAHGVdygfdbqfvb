@@ -233,11 +233,18 @@ def main():
                 parts = re.split(r"\s*[-–]\s*", cell(r, "cut").lstrip("'")) if cell(r, "cut") else []
                 cut_a, cut_b = (parse_time(parts[0]), parse_time(parts[1])) if len(parts) == 2 else (None, None)
                 manual = cut_a is not None or cut_b is not None
-                if manual:  # your ✂️ START / END from the sheet
+                if manual and "Trim" in fix:
+                    manual = False      # 👎 said the trim was wrong: use the 👎 trim option instead
+                if manual:  # ✂️ START / END from the sheet (yours, or the robot's smart cut)
                     a0 = max(0.0, min(cut_a or 0.0, max(dur - 1, 0)))
                     b0 = min(cut_b if cut_b is not None else dur, dur)
                     if b0 <= a0 + 0.5:
                         raise RuntimeError(f"✂️ CUT ({cell(r, 'cut')}): end must be after start")
+                    for w in words:          # never cut mid-word
+                        if w["start"] < a0 < w["end"]:
+                            a0 = max(0.0, w["start"] - 0.15)
+                        if w["start"] < b0 < w["end"]:
+                            b0 = min(dur, w["end"] + 0.3)
                     window, clip_len = a0, min(b0 - a0, C.MAX_CLIP_SECONDS)
                 elif "Trim: use the full clip" in fix or "Trim / cut is off" in fix:   # 👎 whole clip, no auto-cut
                     window, clip_len = 0.0, min(dur, C.MAX_CLIP_SECONDS)
