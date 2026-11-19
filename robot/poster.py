@@ -150,6 +150,33 @@ def wrong_channels(key):
     return bad
 
 
+def skip_batches(g, sheet, review):
+    heads = [r for r in review if is_header(r) and str(r[R_BAD]).strip() not in ("", "FALSE")]
+    if not heads:
+        return review
+    head, rows = panel(g, sheet)
+    drop = []
+    for h in heads:
+        bid = str(h[R_BATCH]).strip()
+        for i, r in enumerate(review):
+            if str(r[R_BATCH]).strip() != bid:
+                continue
+            if is_header(r):
+                drop.append(i)
+                if str(r[R_FILE]).strip():
+                    try:
+                        g.trash(str(r[R_FILE]).strip())
+                    except Exception:
+                        pass
+            elif not str(r[R_STATUS]).startswith("📅"):
+                set_panel(g, sheet, head, rows, str(r[R_ID]).strip(),
+                          {"Status": "Skipped", "✅ YOUR DECISION": "Reject", "Notes": "🤖 batch skipped"})
+                drop.append(i)
+        print(f"Skipped batch {bid}")
+    delete_rows(g, sheet, drop)
+    return read_review(g, sheet)
+
+
 def handle_bad(g, sheet, review, now):
     """👎 + a reason -> fix it right away; the new video comes back into the same row (⏳ until then)."""
     head, rows = panel(g, sheet)
@@ -396,6 +423,10 @@ def main():
     if make_batch(g, sheet, review, now):
         review = read_review(g, sheet)
 
+    try:   # 👎 on a BATCH row (any value) = skip that whole batch: nothing in it that isn't booked yet posts
+        review = skip_batches(g, sheet, review)
+    except Exception as e:
+        print(f"skip batch problem: {e}")
     try:
         if handle_bad(g, sheet, review, now):
             review = read_review(g, sheet)
