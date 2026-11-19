@@ -41,12 +41,19 @@ def main():
     have, per_streamer = {a: 0 for a in C.CHANNELS}, {}
     if os.environ.get("RUSH_TOP_UP") == "yes":
         import re
+        tags = []
         for r in rows:
-            m = re.match(r"🤖 AUTO rush ch(\d)", cell(r, "Notes"))
-            if m and cell(r, "✅ YOUR DECISION") != "Reject":
-                have[int(m.group(1))] = have.get(int(m.group(1)), 0) + 1
-                st = cell(r, "Streamer").lower()
-                per_streamer[st] = per_streamer.get(st, 0) + 1
+            m = re.match(r"🤖 AUTO rush ch(\d) (\d\d)/(\d\d) (\d+)(AM|PM)", cell(r, "Notes"))
+            if m:
+                h = int(m.group(4)) % 12 + (12 if m.group(5) == "PM" else 0)
+                tags.append(((m.group(2), m.group(3), h), r, int(m.group(1))))
+        if tags:
+            latest = max(t for t, _, _ in tags)          # only the most recent rush counts
+            for t, r, a in tags:
+                if t == latest and cell(r, "✅ YOUR DECISION") != "Reject":
+                    have[a] += 1
+                    st = cell(r, "Streamer").lower()
+                    per_streamer[st] = per_streamer.get(st, 0) + 1
     need = {a: max(0, per - have[a]) for a in C.CHANNELS}
     only = [int(x) for x in (os.environ.get("RUSH_CHANNELS") or "").replace(" ", "").split(",") if x]
     if only:
