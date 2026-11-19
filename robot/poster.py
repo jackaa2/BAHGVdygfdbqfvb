@@ -546,6 +546,11 @@ def main():
                     print(f"{clip_id} ch{a}: already on that channel, skipped")
                     dupes += 1
                     continue
+                if a in getattr(C, "PAUSED_CHANNELS", set()):
+                    g.update_values(sheet, f"'{C.REVIEW_TAB}'!{L(R_STATUS)}{rn}",
+                                    [[f"⏸ Ch{a} is paused - not posting"]])
+                    unconfirmed += 1
+                    continue
                 if a in wrong:
                     g.update_values(sheet, f"'{C.REVIEW_TAB}'!{L(R_STATUS)}{rn}",
                                     [[f"⚠️ Upload-Post Ch{a} is linked to the wrong YouTube channel - fix, then re-tick"]])

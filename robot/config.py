@@ -190,3 +190,7 @@ AUTOPILOT_GRACE_HOURS = 3      # reel at 9 AM -> posts by itself at noon if nobo
 
 # 🔥 HOT grab (Rush workflow): last 24 h, any streamer, most-viewed first, at least this many views
 HOT_MIN_VIEWS = 1500
+
+# ⏸ channels on hold: get no new clips and post nothing (set back to set() to resume).
+# Ch2 paused 11/19 1 AM: its Shorts kept vanishing / staying blocked on YouTube while the other 4 went live.
+PAUSED_CHANNELS = {2}

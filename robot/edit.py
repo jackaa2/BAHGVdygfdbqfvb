@@ -347,7 +347,7 @@ def assign_channels():
     """Which channel(s) get this clip. "split": one channel each, taking turns; "all": every channel."""
     if C.POST_MODE == "all":
         return sorted(C.CHANNELS)
-    chans = sorted(C.CHANNELS)
+    chans = [a for a in sorted(C.CHANNELS) if a not in getattr(C, "PAUSED_CHANNELS", set())] or sorted(C.CHANNELS)
     if _turn["n"] is None:   # continue the rotation from everything booked / waiting so far
         g, sheet = Google(), os.environ["SHEET_ID"]
         done = len(g.get_values(sheet, f"'{C.POSTS_TAB}'!A2:A") or [])

@@ -54,7 +54,7 @@ def main():
                     have[a] += 1
                     st = cell(r, "Streamer").lower()
                     per_streamer[st] = per_streamer.get(st, 0) + 1
-    need = {a: max(0, per - have[a]) for a in C.CHANNELS}
+    need = {a: (0 if a in getattr(C, "PAUSED_CHANNELS", set()) else max(0, per - have[a])) for a in C.CHANNELS}
     only = [int(x) for x in (os.environ.get("RUSH_CHANNELS") or "").replace(" ", "").split(",") if x]
     if only:
         need = {a: (n if a in only else 0) for a, n in need.items()}
