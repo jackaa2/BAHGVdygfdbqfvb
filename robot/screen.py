@@ -330,7 +330,7 @@ def main():
                 if not hooks and postable:
                     raise RuntimeError("Claude returned no hooks")
                 if test:
-                    print(f"TEST {clip_id} ({cell(r, 'streamer')}) moment: {res.get('moment')}")
+                    print(f"TEST {clip_id} ({cell(r, 'streamer')}, {cell(r, 'secs')}s) cut: {res.get('cut')} -> {smart_cut(res.get('cut'), cell(r, 'secs')) or 'keep all'} | moment: {res.get('moment')}")
                     for h in hooks:
                         print(f"TEST    {h}")
                     continue
