@@ -39,7 +39,7 @@ class Twitch:
         slugs = [x for x in slugs if x]
         for i in range(0, len(slugs), 100):
             for c in self._get("clips", [("id", x) for x in slugs[i:i + 100]]):
-                out[c["id"].lower()] = int(c.get("view_count") or 0)
+                out[c["id"]] = int(c.get("view_count") or 0)
         return out
 
     def game_ids(self, names):

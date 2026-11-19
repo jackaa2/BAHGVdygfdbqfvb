@@ -109,7 +109,7 @@ def refresh_views(g, sheet, tw):
     for x in g.get_values(sheet, f"'{C.CLIP_LOG_TAB}'!A2:C") or []:
         m = re.search(r"twitch\.tv/[^/]+/clip/([\w-]+)", x[2] if len(x) > 2 else "")
         if m:
-            link[str(x[0]).strip()] = m.group(1).lower()
+            link[str(x[0]).strip()] = m.group(1)          # Twitch clip IDs are case-sensitive
     rows = g.get_values(sheet, f"'{C.PANEL_TAB}'!A{C.HEADER_ROWS + 1}:Z") or []
     want = {str(r[0]).strip(): link[str(r[0]).strip()] for r in rows
             if r and str(r[0]).strip() in link and len(r) > si and str(r[si]).strip() == "New"}
