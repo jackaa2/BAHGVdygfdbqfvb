@@ -261,7 +261,7 @@ def main():
 
                 # YouTube channels 1-5 (each with its own hook so no two channels post the same video)
                 from render import WM_DIR
-                m = re.search(r"AUTO (?:redo|rush|swap \S+) ch(\d)", cell(r, "notes"))
+                m = re.search(r"AUTO (?:redo|rush|fill|swap \S+) ch(\d)", cell(r, "notes"))
                 targets = [int(m.group(1))] if m else assign_channels()   # a 👎 fix stays on its channel
                 jobs = [(a, f"A{a}", C.ACCOUNT_FOLDERS[a], f"{clip_id}_A{a}.mp4") for a in targets]
                 if getattr(C, "MAKE_TIKTOK", False):

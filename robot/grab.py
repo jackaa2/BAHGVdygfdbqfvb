@@ -148,11 +148,40 @@ def auto_pick(g, sheet, now_et):
     ci = {k: head.index(v) for k, v in need.items()}
     rows = g.get_values(sheet, f"'{C.PANEL_TAB}'!A{C.HEADER_ROWS + 1}:Z", formulas=True)
     cell = lambda r, k: str(r[ci[k]]).strip() if len(r) > ci[k] else ""
-    taken = sum(1 for r in rows if cell(r, "notes").startswith(tag) and cell(r, "dec") != "Reject")
-    want = C.AUTO_PICKS_PER_WINDOW - taken
+    # 💸 only pick what's needed: each channel keeps about QUEUE_TARGET Shorts lined up (≈ a day of posts).
+    # Clips already queued, waiting on Review, or still being made all count. No need -> no Claude spend.
+    import re as _re
+    queue = {a: 0 for a in C.CHANNELS}
+    for p in g.get_values(sheet, f"'{C.POSTS_TAB}'!B2:H") or []:
+        try:
+            t = dt.datetime.strptime(str(p[6]).strip(), "%Y-%m-%d %H:%M").replace(tzinfo=ET)
+            if t > now_et:
+                queue[int(p[0])] += 1
+        except (ValueError, IndexError, KeyError):
+            pass
+    for r in g.get_values(sheet, f"'{C.REVIEW_TAB}'!A{C.REVIEW_HEADER_ROW + 1}:K") or []:
+        if r and not str(r[0]).startswith("BATCH") and len(r) > 10 and not str(r[10]).startswith(("📅", "🚫")):
+            try:
+                queue[int(r[1])] += 1
+            except (ValueError, KeyError):
+                pass
+    making = 0
+    for r in rows:
+        if cell(r, "dec") == "Approve" and cell(r, "status") not in ("Ready to Post", "Scheduled", "Posted", "Skipped"):
+            m = _re.search(r"ch(\d)", cell(r, "notes"))
+            if m and int(m.group(1)) in queue:
+                queue[int(m.group(1))] += 1
+            else:
+                making += 1
+    live = [a for a in C.CHANNELS if a not in getattr(C, "PAUSED_CHANNELS", set())]
+    for k in range(making):                       # untagged ones in progress: spread them out
+        queue[min(live, key=lambda a: queue[a])] += 1
+    need = {a: max(0, C.QUEUE_TARGET - queue[a]) for a in live}
+    want = sum(need.values())
+    print(f"Queue per channel {queue} -> picking {want}")
     if want <= 0:
         return 0
-    since = now_et - dt.timedelta(hours=hours)
+    since = now_et - dt.timedelta(hours=24)
 
     def grabbed_at(v):
         try:   # the sheet keeps dates as day numbers since 1899-12-30
@@ -179,10 +208,15 @@ def auto_pick(g, sheet, now_et):
         if t and t >= since:
             cands.append((views(r) * boost.get(cell(r, "streamer").lower(), 1.0), i))
     picks = [i for _, i in sorted(cands, reverse=True)[:want]]
+    data = {}
     for i in picks:
+        a = max(need, key=lambda x: need[x])     # the emptiest channel gets the next-best clip
+        need[a] -= 1
         rn = C.HEADER_ROWS + 1 + i
-        for k, v in (("dec", "Approve"), ("status", "Waiting for Hook"), ("notes", tag)):
-            g.update_values(sheet, f"'{C.PANEL_TAB}'!{col_a1(ci[k])}{rn}", [[v]])
+        for k, v in (("dec", "Approve"), ("status", "Waiting for Hook"),
+                     ("notes", f"{AUTO_TAG} fill ch{a} {now_et:%m/%d %-I%p}")):
+            data[f"'{C.PANEL_TAB}'!{col_a1(ci[k])}{rn}"] = [[v]]
+    g.update_many(sheet, data)
     return len(picks)
 
 

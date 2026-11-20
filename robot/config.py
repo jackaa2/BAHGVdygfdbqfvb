@@ -199,3 +199,7 @@ PAUSED_CHANNELS = {2}
 UPLOAD_AHEAD_MIN = 75
 UPLOADS_PER_RUN = 3
 UPLOAD_GAP_SECONDS = 20
+
+# 💸 Claude only screens what's needed: auto-pick tops each channel up to this many Shorts lined up
+# (queued + on Review + being made). 8 = about one day of posts at one every 3 h.
+QUEUE_TARGET = 8
