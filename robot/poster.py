@@ -208,6 +208,8 @@ def upload_due(g, sheet, key, now, booked, next_slot, wrong):
             except Exception:
                 fid = ""
         # 1) sent but not confirmed yet -> ask Upload-Post
+        if rid == "BLOCKED":
+            continue
         if rid and "youtube.com" not in link and now - slot < dt.timedelta(days=2):
             try:
                 st = requests.get(f"https://api.upload-post.com/api/uploadposts/status?request_id={rid}",
@@ -239,6 +241,16 @@ def upload_due(g, sheet, key, now, booked, next_slot, wrong):
         try:
             with tempfile.TemporaryDirectory() as tmp:
                 path = g.download(fid, os.path.join(tmp, f"{cid}_A{a}.mp4"))
+                # 🔞 last check on the finished video, many frames, nudity only (cheap: Haiku)
+                ak = os.environ.get("ANTHROPIC_API_KEY")
+                if ak:
+                    from screen import nudity_check
+                    why = nudity_check(ak, path)
+                    if why:
+                        data[f"'{C.POSTS_TAB}'!I{rn}"] = [[f"🚫 blocked before upload: {why}"]]
+                        data[f"'{C.POSTS_TAB}'!M{rn}"] = [["BLOCKED"]]
+                        print(f"{cid} ch{a}: 🚫 blocked ({why})")
+                        continue
                 with open(path, "rb") as f:
                     resp = requests.post(API, headers={**H, "Idempotency-Key": f"{cid}-A{a}-{fid}-{slot:%m%d%H%M}"},
                                          data={"user": C.UPLOAD_POST_USERS.get(a), "platform[]": "youtube",

@@ -49,6 +49,7 @@ jobs:
           GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
           SHEET_ID: ${{ secrets.SHEET_ID }}
           FORCE_BATCH: ${{ inputs.force_batch }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: python -u poster.py
       - name: Start Claude on 👎 fixes now
         if: steps.post.outputs.fix == 'yes'

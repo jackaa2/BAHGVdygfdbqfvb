@@ -36,7 +36,7 @@ Clip info:
 - Length: {seconds}s
 - What's said (auto transcript with [start-end] times, may be messy): {transcript}
 
-The images are 4 frames from the clip, in order (at 12%, 37%, 63% and 88% of its length).
+The images are 6 frames spread evenly through the clip, in order.
 
 Reply with ONLY this JSON, nothing else:
 {{"postable": true, "reason": "<max 12 words>", "moment": "<the funniest moment, max 15 words>",
@@ -48,8 +48,8 @@ no GTA 6 on screen or being discussed), nothing happens (loading screens, menus,
 it isn't a streamer moment, it's mostly non-English, it's unwatchable, it's hateful, OR it shows real nudity or
 sexual content: exposed breasts/nipples, bare butts, genitals, sex scenes, lap dances, strippers / strip clubs,
 explicit sexual poses - in the game or on the streamer's camera. NOT nudity (these are fine): shirtless guys,
-swimsuits/bikinis at a beach or pool, gym clothes, a towel, crude jokes without anything shown. If you clearly see
-real nudity or a strip club, it's false; don't reject on a guess.
+swimsuits at a beach, gym clothes, crude jokes with nothing shown. Nudity gets channels taken down, so when in
+doubt about nudity or sexual content, it's FALSE.
 Otherwise true. "reason": why, in a few words.
 
 "cut" = how a pro Shorts editor would trim it (use the transcript times + loudest moments):
@@ -195,6 +195,31 @@ def smart_cut(cut, secs):
     return f"{a:.1f}-{b:.1f}"
 
 
+NUDITY_PROMPT = """These are frames spread across a YouTube Short (GTA 6 streamer clip). Look at EVERY frame,
+including small details and the streamer's own camera. Is there ANY nudity or sexual content: exposed breasts or
+nipples, bare butts, genitals, sex acts, strippers / strip club / lap dance, sexual poses? Partial or brief counts.
+Shirtless men and normal swimwear are fine. Answer ONLY JSON: {"nudity": true/false, "why": "<max 10 words>"}"""
+
+
+def nudity_check(key, path, n=12):
+    """Second, stricter look at the FINISHED video right before it uploads: many frames, nudity only.
+    Returns a reason string if it should be blocked, '' if clean. Fails safe (blocks) if it can't check."""
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        imgs = frames(path, tmp, n=n)
+    if not imgs:
+        return "couldn't check the video"
+    try:
+        res = ask_claude(key, NUDITY_PROMPT, imgs)
+    except Exception as e:
+        return f"couldn't check ({str(e)[:40]})"
+    if res.get("nudity") is True or str(res.get("nudity")).lower() == "true":
+        return str(res.get("why") or "nudity")[:60]
+    if "nudity" not in res:
+        return "unclear check"
+    return ""
+
+
 def ask_claude(key, prompt, imgs):
     content = [{"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": b}}
                for b in imgs] + [{"type": "text", "text": prompt}]
@@ -314,7 +339,7 @@ def main():
                 if not m:
                     continue
                 path = g.download(m.group(1), os.path.join(tmp, "clip.mp4"))
-                imgs = frames(path, tmp)
+                imgs = frames(path, tmp, n=6)
                 prompt = PROMPT.format(streamer=cell(r, "streamer"), platform=cell(r, "platform"),
                                        title=cell(r, "title").lstrip("'"), views=cell(r, "views"),
                                        seconds=cell(r, "secs"), transcript=transcript(path), learned=LEARNED)
