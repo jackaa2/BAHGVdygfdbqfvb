@@ -201,7 +201,7 @@ nipples, bare butts, genitals, sex acts, strippers / strip club / lap dance, sex
 Shirtless men and normal swimwear are fine. Answer ONLY JSON: {"nudity": true/false, "why": "<max 10 words>"}"""
 
 
-def nudity_check(key, path, n=12):
+def nudity_check(key, path, n=20):
     """Second, stricter look at the FINISHED video right before it uploads: many frames, nudity only.
     Returns a reason string if it should be blocked, '' if clean. Fails safe (blocks) if it can't check."""
     import tempfile
@@ -209,10 +209,15 @@ def nudity_check(key, path, n=12):
         imgs = frames(path, tmp, n=n)
     if not imgs:
         return "couldn't check the video"
-    try:
+    global MODELS
+    keep = MODELS
+    try:   # the safety check uses the sharper model (about 1 cent a video)
+        MODELS = ["claude-sonnet-5-5", "claude-haiku-5-5"]
         res = ask_claude(key, NUDITY_PROMPT, imgs)
     except Exception as e:
         return f"couldn't check ({str(e)[:40]})"
+    finally:
+        MODELS = keep
     if res.get("nudity") is True or str(res.get("nudity")).lower() == "true":
         return str(res.get("why") or "nudity")[:60]
     if "nudity" not in res:

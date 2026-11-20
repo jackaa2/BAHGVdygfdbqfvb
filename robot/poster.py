@@ -245,7 +245,7 @@ def upload_due(g, sheet, key, now, booked, next_slot, wrong):
                 ak = os.environ.get("ANTHROPIC_API_KEY")
                 if ak:
                     from screen import nudity_check
-                    why = nudity_check(ak, path)
+                    why = nudity_check(ak, path, n=20)
                     if why:
                         data[f"'{C.POSTS_TAB}'!I{rn}"] = [[f"🚫 blocked before upload: {why}"]]
                         data[f"'{C.POSTS_TAB}'!M{rn}"] = [["BLOCKED"]]

@@ -23,7 +23,7 @@ for i, p in enumerate(posts):
         continue
     with tempfile.TemporaryDirectory() as tmp:
         path = g.download(fid, os.path.join(tmp, f"{cid}.mp4"))
-        why = nudity_check(ak, path, n=16)
+        why = nudity_check(ak, path, n=20)
     if not why or why.startswith(("couldn't", "unclear")):
         print(f"{cid} ch{a}: clean" + (f" ({why})" if why else ""))
         continue
