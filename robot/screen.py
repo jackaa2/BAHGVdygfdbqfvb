@@ -57,7 +57,8 @@ Otherwise true. "reason": why, in a few words.
   menus, dead air and unrelated chatter at the beginning. Never start mid-sentence.
 - end about 1-1.5 s after the reaction / laugh dies down. Never cut the payoff or the reaction. Never end
   mid-sentence. Cut anything after that (talking to chat, menus, silence).
-- usually 10-45 s. If the whole clip is already tight, use start 0 and end = its full length.
+- SHORT WINS: aim for 12-30 s (people must watch to the end and replay). Only go past 40 s if the whole
+  thing is the joke. If the whole clip is already tight, use start 0 and end = its full length.
 
 Hooks = the caption on top of the Short AND its YouTube title. They decide if someone stops scrolling.
 First, find THE moment: the single funniest / most shocking thing that happens or is said (use the transcript
@@ -118,18 +119,24 @@ def learned_style(g, sheet):
         rows = g.get_values(sheet, f"'{C.POSTS_TAB}'!G2:J") or []
     except Exception:
         return ""
+    import datetime as _dt
+    from zoneinfo import ZoneInfo
+    now = _dt.datetime.now(ZoneInfo("America/New_York")).replace(tzinfo=None)
     scored = []
-    for r in rows:
+    for r in rows:     # only Shorts that have been live 24 h+ (fresh ones always show 0 and would mislead)
         if len(r) >= 4 and str(r[0]).strip():
             try:
+                live = _dt.datetime.strptime(str(r[1]).strip(), "%Y-%m-%d %H:%M")
+                if now - live < _dt.timedelta(hours=24):
+                    continue
                 scored.append((float(str(r[3]).replace(",", "")), str(r[0]).strip()))
             except ValueError:
                 pass
-    if len(scored) < 10:
-        return ""
     scored.sort(reverse=True)
-    best = [h for _, h in scored[:8]]
-    worst = [h for _, h in scored[-5:]]
+    best = [f"{h} ({v:.0f} views)" for v, h in scored[:8] if v > 0]
+    worst = [f"{h} ({v:.0f})" for v, h in scored[-5:]]
+    if not best:
+        return ""
     return ("\n\nWHAT WORKS ON OUR CHANNELS (real view counts) - write more like the top ones, avoid the bottom ones' style:\n"
             "Top hooks: " + " | ".join(best) + "\nWorst hooks: " + " | ".join(worst))
 

@@ -27,7 +27,7 @@ def _posts(g, sheet):
                 break
             except ValueError:
                 pass
-        if t is None or now - t < dt.timedelta(hours=48):
+        if t is None or now - t < dt.timedelta(hours=24):
             continue
         out.append({"streamer": str(p[4]).strip().lower(), "hour": t.hour, "views": views})
     return out
