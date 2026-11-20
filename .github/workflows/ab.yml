@@ -1,0 +1,25 @@
+name: Start no-hook test
+on:
+  workflow_dispatch: {}
+permissions:
+  contents: read
+  actions: write
+jobs:
+  diag:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -q requests
+      - working-directory: robot
+        env:
+          UPLOAD_POST_KEY: ${{ secrets.UPLOAD_POST_KEY }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
+          SHEET_ID: ${{ secrets.SHEET_ID }}
+          GH_TOKEN: ${{ github.token }}
+        run: python -u ab_prep.py && gh workflow run edit.yml -R ${{ github.repository }}

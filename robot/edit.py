@@ -268,12 +268,23 @@ def main():
                     jobs += [(t, f"T{t}", C.TIKTOK_FOLDERS[t], f"{clip_id}_TT{t}.mp4") for t in sorted(C.TIKTOK_FOLDERS)
                              if os.path.exists(os.path.join(WM_DIR, f"T{t}.png"))]
 
+                import hashlib
+                no_hook = "nohook" in fix or (C.NO_HOOK_SHARE > 0 and "Hook is bad" not in fix and "AUTO" in fix
+                           and int(hashlib.md5(clip_id.encode()).hexdigest(), 16) % 100 < C.NO_HOOK_SHARE * 100)
+                try:   # 🧪 remember which version this clip got
+                    ids = [str(x[0]).strip() if x else "" for x in g.get_values(sheet, f"'{C.CLIP_LOG_TAB}'!A2:A") or []]
+                    if clip_id in ids:
+                        g.update_values(sheet, f"'{C.CLIP_LOG_TAB}'!H{ids.index(clip_id) + 2}",
+                                        [["no-hook" if no_hook else "hook"]])
+                except Exception as e:
+                    print(f"variant log: {e}")
+
                 def one(job):
                     a, wm_name, folder, name = job
                     st_ = accts[a]
                     out = os.path.join(tmp, name)
                     hook_text = per_channel.get(a, cell(r, "top")) if wm_name.startswith("A") else cell(r, "top")
-                    render(src, out, a, words, static_caption(hook_text, "") if C.SHOW_HOOK else "", "#FFFFFF",
+                    render(src, out, a, words, static_caption(hook_text, "") if (C.SHOW_HOOK and not no_hook) else "", "#FFFFFF",
                            hook_font, st_["handle"] if C.SHOW_WATERMARK else "", st_["spot"], st_["zoom"],
                            window if (manual or "Trim" in fix) else min(window + st_["trim"], max(dur - 3, 0)), tmp,
                            platform=cell(r, "platform") or "Twitch", streamer=cell(r, "streamer"),
@@ -297,7 +308,7 @@ def main():
                             a = int(m.group(1))
                             review.append(review_row(clip_id, a, per_channel.get(a, cell(r, "top")),
                                                      cell(r, "streamer"), vid))
-                if review:
+                if review and "requeue" not in fix:     # 🧪 re-renders of already-queued Shorts skip Review
                     add_review_rows(g, sheet, review)
                 if PREVIEWS and os.environ.get("PREVIEW_UPLOAD") == "yes":
                     try:
@@ -311,7 +322,7 @@ def main():
                         print(f"preview upload failed: {e}")
                 put(rownum, "edited", '=HYPERLINK("https://drive.google.com/drive/folders/'
                     f'{C.FOLDERS["ready"][0]}","✅ {made} versions")', clip_id)
-                put(rownum, "status", "Ready to Post", clip_id)
+                put(rownum, "status", "Scheduled" if "requeue" in fix else "Ready to Post", clip_id)
                 try:
                     g.touch(fid)  # raw is kept 1 more day from now, then the clean-up deletes it
                 except Exception as e:

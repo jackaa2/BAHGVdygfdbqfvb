@@ -621,7 +621,8 @@ def main():
                 return t
 
     # 🚫 never the same video twice on one channel: by our clip ID and by the original Twitch/Kick clip
-    clip_log = g.get_values(sheet, f"'{C.CLIP_LOG_TAB}'!A2:C") or []
+    clip_log = g.get_values(sheet, f"'{C.CLIP_LOG_TAB}'!A2:H") or []
+    variant_of = {str(x[0]).strip(): str(x[7]).strip() for x in clip_log if len(x) > 7 and x[7]}
     src_of = {str(x[0]).strip(): str(x[1]).strip().lower() for x in clip_log if len(x) > 1 and x[1]}
     link_of = {str(x[0]).strip(): str(x[2]).strip() for x in clip_log if len(x) > 2 and x[2]}
     on_channel = set()
@@ -717,13 +718,13 @@ def main():
                 hook = str(r[R_HOOK]).strip() or f"{r[R_STREAMER]} in GTA 6"
                 # queued: the video uploads by itself ~1 h before its slot (one at a time, so YouTube never
                 # sees a burst of uploads - that's what got 19 uploads rate-limited at once)
-                g.append_rows(sheet, f"'{C.POSTS_TAB}'!A:P", [[
+                g.append_rows(sheet, f"'{C.POSTS_TAB}'!A:Q", [[
                     now.strftime("%Y-%m-%d %H:%M"), a, C.CHANNELS[a], clip_id, r[R_STREAMER],
                     (f'=HYPERLINK("{link_of[clip_id]}","original")' if clip_id in link_of else ""), hook,
                     slot.strftime("%Y-%m-%d %H:%M"), "🕒 queued - uploads about 1 h before it goes live",
                     "", "", "", "", "",
                     "autopilot" if (auto and not one and not ticked(h[R_POST])) else "you",
-                    str(r[R_FILE]).strip()]])
+                    str(r[R_FILE]).strip(), variant_of.get(clip_id, "hook")]])
                 g.update_values(sheet, f"'{C.REVIEW_TAB}'!{L(R_STATUS)}{rn}:{L(R_LIVE)}{rn}",
                                 [[f"📅 Booked {slot:%a %-I:%M %p}", slot.strftime("%Y-%m-%d %H:%M")]])
                 set_panel(g, sheet, head, rows, clip_id, {"Status": "Scheduled"})

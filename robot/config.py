@@ -209,3 +209,7 @@ QUEUE_TARGET = 4
 # back to "one every POST_EVERY_HOURS".
 POST_TIMES = ["12:00", "19:00"]
 CHANNEL_STAGGER_MIN = 25
+
+# 🧪 A/B test (started 11/20): this share of new videos is made WITHOUT the hook card on the video
+# (title still uses the hook). Logged on 🧾 Clip log (col H) + 📒 Posts (col Q) so results can be compared.
+NO_HOOK_SHARE = 0.33
