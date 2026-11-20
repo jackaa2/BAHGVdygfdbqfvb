@@ -1,0 +1,28 @@
+name: Take down Shorts (no repost)
+on:
+  workflow_dispatch:
+    inputs:
+      ids:
+        description: "Clip IDs, comma separated"
+        required: true
+permissions:
+  contents: read
+jobs:
+  takedown:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -q requests
+      - working-directory: robot
+        env:
+          TAKEDOWN_IDS: ${{ inputs.ids }}
+          UPLOAD_POST_KEY: ${{ secrets.UPLOAD_POST_KEY }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
+          SHEET_ID: ${{ secrets.SHEET_ID }}
+        run: python -u takedown.py
