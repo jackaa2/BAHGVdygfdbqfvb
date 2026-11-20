@@ -202,4 +202,10 @@ UPLOAD_GAP_SECONDS = 20
 
 # 💸 Claude only screens what's needed: auto-pick tops each channel up to this many Shorts lined up
 # (queued + on Review + being made). 8 = about one day of posts at one every 3 h.
-QUEUE_TARGET = 8
+QUEUE_TARGET = 4
+
+# 📅 2 Shorts a day per channel, at good US hours (ET). Each channel is CHANNEL_STAGGER_MIN later than the
+# one before (ch1 12:00, ch2 12:25, ...), plus the random +-SLOT_JITTER_MIN nudge. Remove POST_TIMES to go
+# back to "one every POST_EVERY_HOURS".
+POST_TIMES = ["12:00", "19:00"]
+CHANNEL_STAGGER_MIN = 25

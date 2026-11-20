@@ -151,6 +151,41 @@ def wrong_channels(key):
     return bad
 
 
+def reslot_queue(g, sheet, now, booked, next_slot):
+    """Posts still waiting to upload (🕒) that don't sit on the current schedule (e.g. after changing how
+    many posts a day) get moved onto it, in order. Already-uploaded ones keep their time."""
+    if not getattr(C, "POST_TIMES", None):
+        return
+    posts = g.get_values(sheet, f"'{C.POSTS_TAB}'!A2:M") or []
+
+    def on_schedule(a, t):
+        for hm in C.POST_TIMES:
+            h_, m_ = map(int, hm.split(":"))
+            base = t.replace(hour=h_, minute=0, second=0) + dt.timedelta(minutes=m_ + (a - 1) * C.CHANNEL_STAGGER_MIN)
+            if abs(t - base) <= dt.timedelta(minutes=C.SLOT_JITTER_MIN + 60):
+                return True
+        return False
+
+    queued = []
+    for i, p in enumerate(posts):
+        p = p + [""] * (13 - len(p))
+        t = parse_et(p[7])
+        if t and not str(p[12]).strip() and str(p[8]).startswith("🕒"):
+            queued.append((int(p[1] or 0), t, i))
+    data = {}
+    for a, t, i in sorted(queued, key=lambda x: (x[0], x[1])):
+        if a and not on_schedule(a, t):
+            booked[a].discard(t)
+    for a, t, i in sorted(queued, key=lambda x: (x[0], x[1])):
+        if a and not on_schedule(a, t):
+            new = next_slot(a, now + dt.timedelta(minutes=60))
+            booked[a].add(new)
+            data[f"'{C.POSTS_TAB}'!H{i + 2}"] = [[new.strftime("%Y-%m-%d %H:%M")]]
+    if data:
+        print(f"Moved {len(data)} queued Short(s) onto the new schedule")
+    g.update_many(sheet, data)
+
+
 def upload_due(g, sheet, key, now, booked, next_slot, wrong):
     """📒 Posts is the queue. Each run:
     1) checks uploads that were sent: failed (e.g. YouTube rate limit) -> back in the queue, new slot if needed
@@ -538,6 +573,23 @@ def main():
         random few minutes (e.g. 9:23, 12:41, 3:07) so it doesn't look robotic. Never two channels within
         SLOT_MIN_APART_MIN minutes of each other."""
         import random
+        if getattr(C, "POST_TIMES", None):          # fixed daily times (e.g. noon + 7 PM), channels staggered
+            day = after.replace(hour=0, minute=0, second=0, microsecond=0)
+            everyone = [t for ts in booked.values() for t in ts]
+            for d in range(60):
+                for hm in C.POST_TIMES:
+                    h_, m_ = map(int, hm.split(":"))
+                    base = day + dt.timedelta(days=d, hours=h_, minutes=m_ + (a - 1) * C.CHANNEL_STAGGER_MIN)
+                    if any(abs(t - base) < dt.timedelta(minutes=90) for t in booked[a]):
+                        continue
+                    j = random.Random(f"{a}-{base:%Y%m%d%H%M}").randint(-C.SLOT_JITTER_MIN, C.SLOT_JITTER_MIN)
+                    t = base + dt.timedelta(minutes=j)
+                    for _ in range(20):
+                        if all(abs(t - o) >= dt.timedelta(minutes=C.SLOT_MIN_APART_MIN) for o in everyone):
+                            break
+                        t += dt.timedelta(minutes=C.SLOT_MIN_APART_MIN)
+                    if t >= after:
+                        return t
         step = C.POST_EVERY_HOURS * 60
         offset = (a - 1) * step // len(C.CHANNELS)
         base = after.replace(hour=0, minute=0, second=0, microsecond=0) - dt.timedelta(days=1) \
@@ -570,6 +622,10 @@ def main():
 
     wrong = wrong_channels(key) if posting else {}
     if posting:
+        try:
+            reslot_queue(g, sheet, now, booked, next_slot)
+        except Exception as e:
+            print(f"reslot problem: {e}")
         try:
             upload_due(g, sheet, key, now, booked, next_slot, wrong)
         except Exception as e:
